@@ -614,21 +614,27 @@ ms1_filtered <- reactive({
       paste0(nm, ".mgf")
     },
     content = function(file) {
+      df1 <- ms1_filtered()
       df2 <- ms2_filtered()
       
+      if (!is.data.frame(df1) || nrow(df1) == 0) {
+        stop("Cannot generate MGF: MS1 spectrum is empty.")
+      }
       if (!is.data.frame(df2) || nrow(df2) == 0) {
-        stop("Cannot generate MGF: MS2 spectrum is empty after filtering.")
+        stop("Cannot generate MGF: MS2 spectrum is empty.")
       }
       
       sp_df <- S4Vectors::DataFrame(
-        mz              = I(list(df2$mz)),
-        intensity       = I(list(df2$intensity)),
-        precursorMz     = input$parent_mass,
-        precursorCharge = as.integer(input$charge),
-        rtime           = c(-1),       
-        msLevel         = as.integer(2),  
-        TITLE           = paste0(input$compound_name)
+        msLevel         = c(1L, 2L),
+        rtime           = c(NA_real_, NA_real_),
+        precursorMz     = c(as.numeric(input$parent_mass), as.numeric(input$parent_mass)),
+        precursorCharge = c(as.integer(input$charge), as.integer(input$charge)),
+        TITLE           = c(paste0(input$compound_name, "_MS1"), paste0(input$compound_name, "_MS2")),
+        FEATURE_ID      = c(input$compound_name, input$compound_name) 
       )
+      
+      sp_df$mz <- list(df1$mz, df2$mz)
+      sp_df$intensity <- list(df1$intensity, df2$intensity)
       
       sps <- Spectra::Spectra(sp_df)
       
