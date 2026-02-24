@@ -668,17 +668,16 @@ ms1_filtered <- reactive({
       FALSE
     })
     
-    valid <- ms1_ok && ms2_ok && ms_ok
+    valid_ms <- ms1_ok && ms2_ok && ms_ok
+    valid_mgf <- ms1_ok && ms2_ok
     
-    if (valid) {
+    if (valid_ms) {
       shinyjs::enable("download_ms")
     } else {
       shinyjs::disable("download_ms")
     }
     
-    valid2 <- ms2_ok
-    
-    if (valid2) {
+    if (valid_mgf) {
       shinyjs::enable("download_mgf")
     } else {
       shinyjs::disable("download_mgf")
