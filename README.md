@@ -1,11 +1,11 @@
-# ms_for_sirius <img src="ms_for_sirius_logo.png" align="right" height="180" width="160">
+# qry4ms <img src="qry4ms.png" align="right" height="180" width="160">
 
 ### Description :bookmark_tabs:
-The [Shiny App](https://shiny.posit.co/) for generating an individual .ms or .mgf file from user-provided MS spectra in MS1 & MS2 levels for a single compound. Spectra can be provided in .txt or pasted directly from the clipboard. The obtained .ms and .mgf files are suitable for processing in [SIRIUS](https://bio.informatik.uni-jena.de/software/sirius/), .mgf - [NIST MS Search](https://chemdata.nist.gov/mass-spc/ms-search/), [MetaboScape](https://www.bruker.com/en/products-and-solutions/mass-spectrometry/ms-software/metaboscape.html). It is also possible to filter by precursor mass and relative abundance, which provides a tidy formatting for the search query in MS fragmentation libraries. Also, there is an option to build a mirror plot from the reference spectra.
+The [Shiny App](https://shiny.posit.co/) for making an MS query. It generates an individual .ms or .mgf file from user-provided MS spectra in MS1 & MS2 levels for a single compound. Spectra can be provided in .txt or pasted directly from the clipboard. The obtained .ms and .mgf files are suitable for processing in [SIRIUS](https://bio.informatik.uni-jena.de/software/sirius/), .mgf - [NIST MS Search](https://chemdata.nist.gov/mass-spc/ms-search/), [MetaboScape](https://www.bruker.com/en/products-and-solutions/mass-spectrometry/ms-software/metaboscape.html). It also filters by precursor mass and relative abundance, which provides a tidy formatting for the search query in MS fragmentation libraries. Also, there is an option to build a mirror plot from the reference spectra.
 
 ### Launch the App :rocket:
 Shiny deployment:<br>
-[**`https://plyush1993.shinyapps.io/ms_for_sirius/`**](https://plyush1993.shinyapps.io/ms_for_sirius/) <br><br>
+[**`https://plyush1993.shinyapps.io/qry4ms/`**](https://plyush1993.shinyapps.io/qry4ms/) <br><br>
 Run locally:
 ```r
 cat("Checking required packages (auto-installing if missing)\n")
@@ -14,7 +14,7 @@ pacman::p_load("shiny", "DT", "ggplot2", "shinythemes", "shinyWidgets", "shinyjs
 if (!requireNamespace("Spectra", quietly = TRUE)) BiocManager::install("Spectra")
 if (!requireNamespace("MsBackendMgf", quietly = TRUE)) BiocManager::install("MsBackendMgf")
 
-source("https://raw.githubusercontent.com/plyush1993/ms_for_sirius/refs/heads/main/app.R")
+source("https://raw.githubusercontent.com/plyush1993/qry4ms/refs/heads/main/app.R")
 shiny::shinyApp(ui, server)
 ```
 <br>
