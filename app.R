@@ -26,15 +26,15 @@ tags$head(tags$style(HTML("
 "))),
 
 tags$head(
-  tags$title("ms_for_sirius"),
+  tags$title("qry4ms"),
   tags$link(rel = "icon", type = "image/png",
-            href = "https://raw.githubusercontent.com/plyush1993/ms_for_sirius/main/ms_for_sirius_logo.png")
+            href = "https://raw.githubusercontent.com/plyush1993/qry4ms/main/qry4ms.png")
 ),
 
 div(
   class = "app-footer",
   HTML('Created by: Ivan Plyushchenko &nbsp;|&nbsp;
-       <a href="https://github.com/plyush1993/ms_for_sirius" target="_blank">GitHub repository</a>')
+       <a href="https://github.com/plyush1993/qry4ms" target="_blank">GitHub repository</a>')
 ),
   
 div(
@@ -47,7 +47,7 @@ div(
   ",
   
   tags$img(
-    src = 'https://raw.githubusercontent.com/plyush1993/ms_for_sirius/main/ms_for_sirius_logo.png',
+    src = 'https://raw.githubusercontent.com/plyush1993/qry4ms/main/qry4ms.png',
     height = '150px',
     style = 'margin-right: 20px;'
   ),
@@ -59,7 +59,7 @@ div(
       color: #0066cc;
       text-align: center;
     ',
-    "MS1/MS2 .ms File Generator for SIRIUS"
+    "Making query for MS1/MS2 data"
   )
 ),
   
