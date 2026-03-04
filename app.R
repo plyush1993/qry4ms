@@ -738,9 +738,9 @@ ms1_filtered <- reactive({
     # 4. Build the data frame
     df_adducts <- data.frame(
       Adduct = adds,
-      n = mult,
-      z = z_val,
       mz = as.numeric(res_matrix[1, ]),
+      z = z_val,
+      n = mult,
       stringsAsFactors = FALSE
     )
     
@@ -750,7 +750,7 @@ ms1_filtered <- reactive({
     
     datatable(
       df_adducts,
-      colnames = c("Adduct Type", "Molecules (n)", "Charge (z)", "Calculated m/z"),
+      colnames = c("Adduct Type", "Calculated m/z", "Charge (z)", "Molecules (n)"),
       rownames = FALSE,
       options = list(
         pageLength = 20, 
@@ -766,6 +766,5 @@ ms1_filtered <- reactive({
   })
   
 }
-
 
 shinyApp(ui, server)
