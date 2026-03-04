@@ -12,6 +12,7 @@ library(shinyWidgets)
 library(shinyjs)
 library(Spectra)
 library(MsBackendMgf)
+library(MetaboCoreUtils)
 #library(plotly)
 
 ui <- fluidPage(
@@ -225,7 +226,18 @@ div(
                  br(), br(),
                  plotOutput("mirror_plot", height = "600px")
         ),
-        tabPanel("Raw .ms text", verbatimTextOutput("preview_ms"))
+        tabPanel("Raw .ms text", verbatimTextOutput("preview_ms")),
+        tabPanel("Adduct Calculator",
+         br(),
+         wellPanel(
+           radioButtons("input_type", "Parent mass is:",
+                        choices = c("Neutral mass (M)" = "neutral",
+                                    "Adduct (M+H / M-H)" = "adduct"),
+                        inline = TRUE),
+           #helpText("If 'Adduct' is selected, the neutral mass is first calculated based on your charge (Positive = [M+H]+, Negative = [M-H]-).")
+         ),
+         DTOutput("adduct_table")
+)
       )
     )
   )
@@ -683,6 +695,74 @@ ms1_filtered <- reactive({
       shinyjs::disable("download_mgf")
     }
     
+  })
+  
+  # Reactive to calculate the neutral mass (M)
+  neutral_mass <- reactive({
+    req(input$parent_mass, input$charge)
+    if (input$input_type == "neutral") {
+      return(as.numeric(input$parent_mass))
+    } else {
+      # Back-calculate M from the assumed [M+H]+ or [M-H]-
+      add_type <- if (input$charge > 0) "[M+H]+" else "[M-H]-"
+      val <- MetaboCoreUtils::mz2mass(input$parent_mass, add_type)
+      return(as.numeric(val))
+    }
+  })
+
+  # Generate the Adduct Table with custom sorting
+  output$adduct_table <- renderDT({
+    req(input$parent_mass, input$charge)
+    
+    m <- neutral_mass()
+    pol <- if (input$charge > 0) "positive" else "negative"
+    
+    # 1. Get all adduct names
+    adds <- MetaboCoreUtils::adductNames(polarity = pol)
+    
+    # 2. Calculate m/z values (returns a matrix)
+    res_matrix <- MetaboCoreUtils::mass2mz(m, adduct = adds)
+    
+    # 3. Parse adduct properties safely
+    # Extract 'n' (number of Ms): look for digit immediately after '['
+    mult_raw <- gsub("^\\[(\\d+)?M.*", "\\1", adds)
+    mult <- as.numeric(mult_raw)
+    mult[mult_raw == "" | is.na(mult)] <- 1  # Default to 1M if empty or NA
+    
+    # Extract charge 'z': look for digits before the final + or -
+    # We use a capture group that handles both [M+H]+ (empty) and [M+2H]2+ (2)
+    z_raw <- gsub("^.*\\](\\d+)?[+-]$", "\\1", adds)
+    z_val <- as.numeric(z_raw)
+    z_val[z_raw == "" | is.na(z_val)] <- 1 # Default to charge 1 if empty or NA
+    
+    # 4. Build the data frame
+    df_adducts <- data.frame(
+      Adduct = adds,
+      n = mult,
+      z = z_val,
+      mz = as.numeric(res_matrix[1, ]),
+      stringsAsFactors = FALSE
+    )
+    
+    # 5. Advanced Sorting:
+    # First by Number of Ms (n), then by Charge (z), then by m/z
+    df_adducts <- df_adducts[order(df_adducts$n, df_adducts$z, df_adducts$mz), ]
+    
+    datatable(
+      df_adducts,
+      colnames = c("Adduct Type", "Molecules (n)", "Charge (z)", "Calculated m/z"),
+      rownames = FALSE,
+      options = list(
+        pageLength = 20, 
+        dom = '<"top"f>rt<"bottom"lp>',
+        columnDefs = list(list(className = 'dt-center', targets = 1:2))
+      ),
+      caption = htmltools::tags$caption(
+        style = 'caption-side: top; text-align: left; color: #0066cc; font-weight: bold; font-size: 16px;',
+        paste("Adduct Map for Neutral Mass (M) =", round(m, 6))
+      )
+    ) %>%
+      formatRound(columns = "mz", digits = 6)
   })
   
 }
