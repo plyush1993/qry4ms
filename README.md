@@ -1,7 +1,12 @@
 # qry4ms <img src="qry4ms.png" align="right" height="180" width="160">
 
 ### Description :bookmark_tabs:
-The [Shiny App](https://shiny.posit.co/) for making an MS query. It generates an individual .ms or .mgf file from user-provided MS spectra in MS1 & MS2 levels for a single compound. Spectra can be provided in .txt or pasted directly from the clipboard. The obtained .ms and .mgf files are suitable for processing in [SIRIUS](https://bio.informatik.uni-jena.de/software/sirius/), .mgf - [NIST MS Search](https://chemdata.nist.gov/mass-spc/ms-search/), [MetaboScape](https://www.bruker.com/en/products-and-solutions/mass-spectrometry/ms-software/metaboscape.html). It also filters by precursor mass and relative abundance, which provides a tidy formatting for the search query in MS fragmentation libraries. Also, there is an option to build a mirror plot from the reference spectra.
+The [Shiny App](https://shiny.posit.co/) for making an MS query: 
+- Generates an individual .ms or .mgf file from user-provided MS spectra in MS1 & MS2 levels for a single compound. Spectra can be provided in .txt or pasted directly from the clipboard.
+- Filters by precursor mass and relative abundance, which provides a tidy formatting for the search query in MS fragmentation libraries.
+- Builds a mirror plot from the reference spectra.
+- Calculates Adducts Map based on [MetaboCoreUtils](https://www.bioconductor.org/packages/release/bioc/html/MetaboCoreUtils.html).
+- Tested in [SIRIUS](https://bio.informatik.uni-jena.de/software/sirius/), and [NIST MS Search](https://chemdata.nist.gov/mass-spc/ms-search/).
 
 ### Launch the App :rocket:
 Shiny deployment:<br>
@@ -13,6 +18,7 @@ if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
 pacman::p_load("shiny", "DT", "ggplot2", "shinythemes", "shinyWidgets", "shinyjs", "BiocManager")
 if (!requireNamespace("Spectra", quietly = TRUE)) BiocManager::install("Spectra")
 if (!requireNamespace("MsBackendMgf", quietly = TRUE)) BiocManager::install("MsBackendMgf")
+if (!requireNamespace("MetaboCoreUtils", quietly = TRUE)) BiocManager::install("MetaboCoreUtils")
 
 source("https://raw.githubusercontent.com/plyush1993/qry4ms/refs/heads/main/app.R")
 shiny::shinyApp(ui, server)
