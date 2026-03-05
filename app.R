@@ -503,7 +503,7 @@ ms1_filtered <- reactive({
       x = "m/z",
       title = "Mirror spectrum"
     ) +
-    theme_minimal(base_size = 12) +
+    theme_minimal(base_size = 16) +
     theme(
       legend.position = "bottom")
   
@@ -559,7 +559,7 @@ ms1_filtered <- reactive({
     ggplot(df, aes(x = mz, y = intensity)) +
       geom_segment(aes(xend = mz, y = 0, yend = intensity)) +
       labs(x = "m/z", y = "Intensity", title = "MS1 spectrum") +
-      theme_minimal(base_size = 12)
+      theme_minimal(base_size = 16)
   })
   
   output$ms1_plot_plotly <- renderPlotly({
@@ -584,7 +584,7 @@ ms1_filtered <- reactive({
     ggplot(df, aes(x = mz, y = intensity)) +
       geom_segment(aes(xend = mz, y = 0, yend = intensity)) +
       labs(x = "m/z", y = "Intensity", title = "MS2 spectrum") +
-      theme_minimal(base_size = 12)
+      theme_minimal(base_size = 16)
   })
   
   output$ms2_plot_plotly <- renderPlotly({
@@ -646,7 +646,7 @@ ms1_filtered <- reactive({
       scale_color_manual(name = "Spectrum", values = c("Sample" = "#104E8B", "Reference" = "#8B1A1A")) +
       scale_y_continuous("Relative intensity (%)", labels = abs) +
       labs(x = "m/z", title = "Mirror spectrum") +
-      theme_minimal(base_size = 12) + theme(legend.position = "bottom")
+      theme_minimal(base_size = 16) + theme(legend.position = "bottom")
   })
   
   output$mirror_plot_plotly <- renderPlotly({
