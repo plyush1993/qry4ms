@@ -13,7 +13,10 @@ library(shinyjs)
 library(Spectra)
 library(MsBackendMgf)
 library(MetaboCoreUtils)
-#library(plotly)
+library(plotly)
+library(enviPat)
+
+data(isotopes, package = "enviPat")
 
 ui <- fluidPage(
   useShinyjs(),
@@ -100,6 +103,9 @@ div(
   sidebarLayout(
     sidebarPanel(
       h4("General settings"),
+      radioButtons("plot_engine", "Plot Style:", 
+                   choices = c("Static" = "static", "Interactive" = "plotly"), 
+                   inline = TRUE),
       textInput("compound_name", "Compound name / file basename:",
                 value = "Compound_X"),
       numericInput("parent_mass", "Parent mass (m/z):",
@@ -201,14 +207,14 @@ div(
     ),
     
         mainPanel(
-      tabsetPanel(
+        tabsetPanel(
         tabPanel("MS1 spectrum",
-                 plotOutput("ms1_plot", height = "300px"),  
+                 uiOutput("ms1_plot_ui"), 
                  br(), br(),  
                  DTOutput("ms1_table")                      
         ),
         tabPanel("MS2 spectrum",
-                 plotOutput("ms2_plot", height = "300px"),  
+                 uiOutput("ms2_plot_ui"), 
                  br(), br(),  
                  DTOutput("ms2_table")
         ),
@@ -221,12 +227,40 @@ div(
                    inline = TRUE
                  ),
                  tags$small(
-                   "Reference spectrum is taken from the CSV uploaded in the sidebar (columns: 'mz', 'intensity')."
+                   "Reference spectrum is taken from the CSV uploaded in the sidebar (columns: 'mz', 'intensity', optionally 'rt')."
                  ),
                  br(), br(),
-                 plotOutput("mirror_plot", height = "600px")
+                 uiOutput("mirror_plot_ui") 
         ),
         tabPanel("Raw .ms text", verbatimTextOutput("preview_ms")),
+        tabPanel("Envipat",
+                 br(),
+                 wellPanel(
+                   fluidRow(
+                     column(3, textInput("envipat_formula", "Formula:", value = "C15H10O7")),
+                     column(3, selectInput("envipat_adduct", "Adduct & Polarity:", 
+                                           choices = c("[M+H]+", "M+", "[M+Na]+", "[M+K]+", "M-", "[M-H]-", "[M+Cl]-"), 
+                                           selected = "[M+H]+")),
+                     column(3, numericInput("envipat_threshold", "Rel. Abundance Threshold (%):", 
+                                            value = 0.1, min = 0, step = 0.1)),
+                     column(3, actionButton("calc_envipat", "Run", 
+                                            class = "btn-info", 
+                                            style = "margin-top: 25px; width: 100%; font-weight: bold;"))
+                   ),
+                   tags$small("Note: Type standard element symbols (e.g., C6H12O6). Case sensitive.")
+                 ),
+                 fluidRow(
+                   column(12, 
+                     div(style = "display: flex; align-items: center; justify-content: center; margin-bottom: 15px;",
+                         tags$b("Monoisotopic m/z: ", style = "margin-right: 10px; font-size: 18px; color: #2c3e50;"),
+                         textInput("mono_mass_out", label = NULL, value = "", width = "150px"),
+                         actionButton("copy_mass", "Copy", icon = icon("clipboard"), 
+                                      style = "margin-left: 10px; margin-bottom: 15px; background-color: #2c3e50; color: white;")
+                     )
+                   )
+                 ),
+                 plotlyOutput("envipat_plot", height = "500px")
+        ),
         tabPanel("Adduct Calculator",
          br(),
          wellPanel(
@@ -396,14 +430,29 @@ ms1_filtered <- reactive({
     df
   })
 
-  ms2_for_mirror <- reactive({
-    if (is.null(input$mirror_source) || input$mirror_source == "filtered") {
-      ms2_filtered()
-    } else {
-      ms2_data()
-    }
+  mirror_data_prep <- reactive({
+    df_s <- ms2_for_mirror()
+    validate(need(nrow(df_s) > 0, "MS2 spectrum has no peaks to show in mirror plot."))
+    df_ref <- lib_ms2_data()
+    
+    max_s   <- max(df_s$intensity,   na.rm = TRUE)
+    max_ref <- max(df_ref$intensity, na.rm = TRUE)
+    validate(
+      need(is.finite(max_s)   && max_s   > 0, "MS2 intensities are zero or NA."),
+      need(is.finite(max_ref) && max_ref > 0, "Reference MS2 intensities are zero or NA.")
+    )
+    
+    df_s$rel   <- 100 * df_s$intensity   / max_s
+    df_ref$rel <- 100 * df_ref$intensity / max_ref
+    df_ref$rel <- -df_ref$rel
+    
+    df_s$type   <- "Sample"
+    df_ref$type <- "Reference"
+    
+    rbind(df_s[, c("mz", "intensity", "rel", "type")], 
+          df_ref[, c("mz", "intensity", "rel", "type")])
   })
-
+    
   output$mirror_plot <- renderPlot({
   df_s <- ms2_for_mirror()
   validate(
@@ -487,30 +536,147 @@ ms1_filtered <- reactive({
     paste(lines, collapse = "\n")
   })
   
-  output$ms1_plot <- renderPlot({
+  # --- UI RENDERING SWITCHES ---
+  output$ms1_plot_ui <- renderUI({
+    if (input$plot_engine == "plotly") plotlyOutput("ms1_plot_plotly", height = "300px")
+    else plotOutput("ms1_plot_static", height = "300px")
+  })
+  
+  output$ms2_plot_ui <- renderUI({
+    if (input$plot_engine == "plotly") plotlyOutput("ms2_plot_plotly", height = "300px")
+    else plotOutput("ms2_plot_static", height = "300px")
+  })
+  
+  output$mirror_plot_ui <- renderUI({
+    if (input$plot_engine == "plotly") plotlyOutput("mirror_plot_plotly", height = "600px")
+    else plotOutput("mirror_plot_static", height = "600px")
+  })
+
+  # --- MS1 PLOTS ---
+  output$ms1_plot_static <- renderPlot({
     df <- ms1_filtered()
-    validate(
-      need(nrow(df) > 0, "No MS1 peaks to plot.")
-    )
-    p <- ggplot(df, aes(x = mz, y = intensity)) +
+    validate(need(nrow(df) > 0, "No MS1 peaks to plot."))
+    ggplot(df, aes(x = mz, y = intensity)) +
       geom_segment(aes(xend = mz, y = 0, yend = intensity)) +
       labs(x = "m/z", y = "Intensity", title = "MS1 spectrum") +
       theme_minimal(base_size = 12)
-    #ggplotly(p)
-    p
   })
   
-  output$ms2_plot <- renderPlot({
+  output$ms1_plot_plotly <- renderPlotly({
+    df <- ms1_filtered()
+    validate(need(nrow(df) > 0, "No MS1 peaks to plot."))
+    
+    df$mz <- as.numeric(df$mz)
+    df$intensity <- as.numeric(df$intensity)
+    
+    df$hover_txt <- paste0("<b>m/z:</b> ", round(df$mz, 4), "<br><b>Int:</b> ", round(df$intensity, 1))
+    
+    plot_ly(df) %>%
+      add_segments(x = ~mz, xend = ~mz, y = 0, yend = ~intensity, line = list(color = "#2c3e50"), hoverinfo="none") %>%
+      add_markers(x = ~mz, y = ~intensity, text = ~hover_txt, hoverinfo = "text", marker = list(color = "#e74c3c", size = 4)) %>%
+      layout(title = "MS1 spectrum", xaxis = list(title = "m/z", tickformat=".4f"), yaxis = list(title = "Intensity"), showlegend = FALSE, hovermode = "closest")
+  })
+
+  # --- MS2 PLOTS ---
+  output$ms2_plot_static <- renderPlot({
     df <- ms2_filtered()
-    validate(
-      need(nrow(df) > 0, "No MS2 peaks to plot.")
-    )
-    p <- ggplot(df, aes(x = mz, y = intensity)) +
+    validate(need(nrow(df) > 0, "No MS2 peaks to plot."))
+    ggplot(df, aes(x = mz, y = intensity)) +
       geom_segment(aes(xend = mz, y = 0, yend = intensity)) +
       labs(x = "m/z", y = "Intensity", title = "MS2 spectrum") +
       theme_minimal(base_size = 12)
-    #ggplotly(p)
-    p
+  })
+  
+  output$ms2_plot_plotly <- renderPlotly({
+    df <- ms2_filtered()
+    validate(need(nrow(df) > 0, "No MS2 peaks to plot."))
+    
+    df$mz <- as.numeric(df$mz)
+    df$intensity <- as.numeric(df$intensity)
+    
+    df$hover_txt <- paste0("<b>m/z:</b> ", round(df$mz, 4), "<br><b>Int:</b> ", round(df$intensity, 1))
+    
+    plot_ly(df) %>%
+      add_segments(x = ~mz, xend = ~mz, y = 0, yend = ~intensity, line = list(color = "#2c3e50"), hoverinfo="none") %>%
+      add_markers(x = ~mz, y = ~intensity, text = ~hover_txt, hoverinfo = "text", marker = list(color = "#e74c3c", size = 4)) %>%
+      layout(title = "MS2 spectrum", xaxis = list(title = "m/z", tickformat=".4f"), yaxis = list(title = "Intensity"), showlegend = FALSE, hovermode = "closest")
+  })
+
+  # --- MIRROR PLOT PREPARATION (Shared between static and plotly) ---
+  ms2_for_mirror <- reactive({
+    if (is.null(input$mirror_source) || input$mirror_source == "filtered") {
+      ms2_filtered()
+    } else {
+      ms2_data()
+    }
+  })
+  
+  mirror_data_prep <- reactive({
+    df_s <- ms2_for_mirror()
+    validate(need(nrow(df_s) > 0, "MS2 spectrum has no peaks to show in mirror plot."))
+    df_ref <- lib_ms2_data()
+    
+    max_s   <- max(df_s$intensity,   na.rm = TRUE)
+    max_ref <- max(df_ref$intensity, na.rm = TRUE)
+    validate(
+      need(is.finite(max_s)   && max_s   > 0, "MS2 intensities are zero or NA."),
+      need(is.finite(max_ref) && max_ref > 0, "Reference MS2 intensities are zero or NA.")
+    )
+    
+    df_s$rel   <- 100 * df_s$intensity   / max_s
+    df_ref$rel <- 100 * df_ref$intensity / max_ref
+    df_ref$rel <- -df_ref$rel
+    
+    df_s$type   <- "Sample"
+    df_ref$type <- "Reference"
+    
+    # If reference lacks rt, make sure it binds cleanly
+    if(!"rt" %in% colnames(df_ref)) df_ref$rt <- NA
+    if(!"rt" %in% colnames(df_s)) df_s$rt <- NA
+    
+    rbind(df_s[, c("mz", "intensity", "rt", "rel", "type")], 
+          df_ref[, c("mz", "intensity", "rt", "rel", "type")])
+  })
+
+  # --- MIRROR PLOTS ---
+  output$mirror_plot_static <- renderPlot({
+    df_all <- mirror_data_prep()
+    ggplot(df_all, aes(x = mz, xend = mz, y = 0, yend = rel, color = type)) +
+      geom_segment(size = 0.8) +
+      scale_color_manual(name = "Spectrum", values = c("Sample" = "#104E8B", "Reference" = "#8B1A1A")) +
+      scale_y_continuous("Relative intensity (%)", labels = abs) +
+      labs(x = "m/z", title = "Mirror spectrum") +
+      theme_minimal(base_size = 12) + theme(legend.position = "bottom")
+  })
+  
+  output$mirror_plot_plotly <- renderPlotly({
+    df_all <- mirror_data_prep()
+    
+    df_all$mz <- as.numeric(df_all$mz)
+    df_all$intensity <- as.numeric(df_all$intensity)
+    df_all$rel <- as.numeric(df_all$rel)
+    
+    df_s <- df_all[df_all$type == "Sample", ]
+    df_ref <- df_all[df_all$type == "Reference", ]
+    
+    df_s$hover_txt <- paste0("<b>m/z:</b> ", round(df_s$mz, 4), 
+                             "<br><b>Rel Int:</b> ", round(df_s$rel, 1), "%",
+                             "<br><b>Abs Int:</b> ", round(df_s$intensity, 1))
+                             
+    df_ref$hover_txt <- paste0("<b>m/z:</b> ", round(df_ref$mz, 4), 
+                               "<br><b>Rel Int:</b> ", round(abs(df_ref$rel), 1), "%",
+                               "<br><b>Abs Int:</b> ", round(df_ref$intensity, 1))
+    
+    plot_ly() %>%
+      add_segments(data = df_s, x = ~mz, xend = ~mz, y = 0, yend = ~rel, line = list(color = "#104E8B"), hoverinfo="none", name="Sample") %>%
+      add_markers(data = df_s, x = ~mz, y = ~rel, marker = list(color = "#104E8B", size = 4),
+                  text = ~hover_txt, hoverinfo = "text", name = "Sample") %>%
+      add_segments(data = df_ref, x = ~mz, xend = ~mz, y = 0, yend = ~rel, line = list(color = "#8B1A1A"), hoverinfo="none", name="Reference") %>%
+      add_markers(data = df_ref, x = ~mz, y = ~rel, marker = list(color = "#8B1A1A", size = 4),
+                  text = ~hover_txt, hoverinfo = "text", name = "Reference") %>%
+      layout(title = "Mirror spectrum", xaxis = list(title = "m/z"), 
+             yaxis = list(title = "Relative intensity (%)", tickmode = "array", tickvals = seq(-100, 100, 25), ticktext = abs(seq(-100, 100, 25))),
+             hovermode = "closest")
   })
   
   output$ms1_table <- renderDT({
@@ -696,6 +862,122 @@ ms1_filtered <- reactive({
     }
     
   })
+  
+  # envipat
+  output$envipat_plot <- renderPlotly({
+    req(input$envipat_formula, input$envipat_adduct)
+    
+    base_formula <- trimws(input$envipat_formula)
+    adduct <- input$envipat_adduct
+    threshold <- input$envipat_threshold
+    
+    # Validate that formula isn't empty
+    validate(need(nzchar(base_formula), "Please enter a chemical formula."))
+    
+    # 1. Modify formula based on adduct
+    if (adduct == "[M+H]+") {
+      form_adj <- enviPat::mergeform(base_formula, "H1")
+      charge <- 1
+    } else if (adduct == "[M+Na]+") {
+      form_adj <- enviPat::mergeform(base_formula, "Na1")
+      charge <- 1
+    } else if (adduct == "[M+K]+") {
+      form_adj <- enviPat::mergeform(base_formula, "K1")
+      charge <- 1
+    } else if (adduct == "M+") {
+      # No atoms added or removed!
+      form_adj <- base_formula 
+      charge <- 1
+    } else if (adduct == "[M-H]-") {
+      # Need to make sure the formula actually has an H to lose!
+      validate(need(grepl("H", base_formula), "Cannot form [M-H]- because the formula has no Hydrogen!"))
+      form_adj <- enviPat::subform(base_formula, "H1")
+      charge <- -1
+    } else if (adduct == "[M+Cl]-") {
+      form_adj <- enviPat::mergeform(base_formula, "Cl1")
+      charge <- -1
+    } else if (adduct == "M-") {
+      # No atoms added or removed!
+      form_adj <- base_formula 
+      charge <- -1
+    } else {
+      stop("Adduct not supported.")
+    }
+    
+    # 2. Check formula validity safely
+    checked_form <- enviPat::check_chemform(isotopes, form_adj)
+    validate(
+      need(!checked_form$warning, "Invalid chemical formula. Check your capitalization (e.g., 'Cl' not 'cl').")
+    )
+    
+    # 3. Calculate pattern
+    pattern <- enviPat::isopattern(
+      isotopes, 
+      chemforms = checked_form$new_formula, 
+      threshold = threshold, 
+      plotit = FALSE, 
+      verbose = FALSE
+    )
+    
+    iso_df <- as.data.frame(pattern[[1]])
+    
+    # 4. Correct for electron mass
+    mass_electron <- 0.0005485799
+    iso_df$mz_adduct <- (iso_df$`m/z` - (charge * mass_electron)) / abs(charge)
+    iso_df$abundance_pct <- iso_df$abundance
+    
+    mono_mz <- min(iso_df$mz_adduct)
+    updateTextInput(session, "mono_mass_out", value = sprintf("%.6f", mono_mz))
+    
+    observeEvent(input$copy_mass, {
+    req(input$mono_mass_out) # Make sure there is actually a number to copy
+    
+    # Run a quick JavaScript command to select and copy the text
+    shinyjs::runjs("
+      var copyText = document.getElementById('mono_mass_out');
+      copyText.select();
+      document.execCommand('copy');
+    ")
+    
+    # Pop up a temporary success message in the bottom right corner!
+    showNotification("Monoisotopic mass copied to clipboard!", type = "message", duration = 3)
+  })
+    
+    # 5. Render interactive Plotly plot
+    p <- plot_ly(iso_df) %>%
+      add_segments(
+        x = ~mz_adduct, xend = ~mz_adduct,
+        y = 0, yend = ~abundance_pct,
+        line = list(color = "#2c3e50", width = 2),
+        showlegend = FALSE,
+        hoverinfo = "none"
+      ) %>%
+      add_markers(
+        x = ~mz_adduct, y = ~abundance_pct,
+        marker = list(color = "#e74c3c", size = 8),
+        text = ~paste0(
+          "<b>m/z:</b> ", round(mz_adduct, 5), "<br>",
+          "<b>Rel. Abundance:</b> ", round(abundance_pct, 2), "%"
+        ),
+        hoverinfo = "text",
+        name = "Isotopologue"
+      ) %>%
+      layout(
+        title = list(
+          text = paste0("<b>Theoretical Isotopic Pattern</b><br>",
+                        "Formula: ", base_formula, " | Adduct: ", adduct, "<br>",
+                        "Monoisotopic m/z: ", round(mono_mz, 5)),
+          font = list(size = 14)
+        ),
+        xaxis = list(title = "<b>m/z</b>", zeroline = FALSE, tickformat = ".4f"),
+        yaxis = list(title = "<b>Relative Abundance (%)</b>", range = c(0, 105), zeroline = TRUE),
+        hovermode = "closest",
+        plot_bgcolor = "white",
+        paper_bgcolor = "white"
+      )
+    
+    p
+  }) %>% bindEvent(input$calc_envipat)
   
   # Reactive to calculate the neutral mass (M)
   neutral_mass <- reactive({
