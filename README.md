@@ -15,7 +15,7 @@ Run locally:
 ```r
 cat("Checking required packages (auto-installing if missing)\n")
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load("shiny", "DT", "ggplot2", "shinythemes", "shinyWidgets", "shinyjs", "BiocManager")
+pacman::p_load("shiny", "DT", "ggplot2", "shinythemes", "shinyWidgets", "shinyjs", "BiocManager", "plotly", "enviPat")
 if (!requireNamespace("Spectra", quietly = TRUE)) BiocManager::install("Spectra")
 if (!requireNamespace("MsBackendMgf", quietly = TRUE)) BiocManager::install("MsBackendMgf")
 if (!requireNamespace("MetaboCoreUtils", quietly = TRUE)) BiocManager::install("MetaboCoreUtils")
