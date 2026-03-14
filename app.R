@@ -27,6 +27,22 @@ tags$head(tags$style(HTML("
                 padding:8px; background: rgba(255,255,255,0.8);
                 border-top: 1px solid #ddd; z-index: 9999; }
   body { padding-bottom: 45px; }
+  
+    .progress.shiny-file-input-progress {
+      height: 22px !important;        /* Makes the bar thicker */
+      margin-top: 10px !important;    /* Adds space above the bar */
+      border-radius: 6px !important;  /* Rounded corners */
+      background-color: #f5f5f5;      /* Background of the empty bar */
+    }
+    
+    .progress.shiny-file-input-progress .progress-bar {
+      line-height: 22px !important;   /* Centers the text vertically */
+      font-size: 14px !important;     /* Larger 'Upload complete' text */
+      font-weight: bold !important;
+      background-color: #0066cc !important; /* Matches your header color */
+    }
+    /* ---------------------------------------- */
+  
 "))),
 
 tags$head(
@@ -89,7 +105,7 @@ div(
       .nav-tabs > li > a {
         font-size: 20px !important;
         font-weight: bold !important;
-        padding: 12px 18px !important;
+        padding: 12px 180px !important;
       }
       .nav-tabs > li.active > a {
         font-size: 22px !important;
