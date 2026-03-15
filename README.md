@@ -17,10 +17,11 @@ Run locally:
 ```r
 cat("Checking required packages (auto-installing if missing)\n")
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load("shiny", "DT", "ggplot2", "shinythemes", "shinyWidgets", "shinyjs", "BiocManager", "plotly", "enviPat")
+pacman::p_load("shiny", "DT", "ggplot2", "shinythemes", "shinyWidgets", "shinyjs", "shinycssloaders", "BiocManager", "plotly", "enviPat", "InterpretMSSpectrum")
 if (!requireNamespace("Spectra", quietly = TRUE)) BiocManager::install("Spectra")
 if (!requireNamespace("MsBackendMgf", quietly = TRUE)) BiocManager::install("MsBackendMgf")
 if (!requireNamespace("MetaboCoreUtils", quietly = TRUE)) BiocManager::install("MetaboCoreUtils")
+if (!requireNamespace("Rdisop", quietly = TRUE)) BiocManager::install("Rdisop")
 
 source("https://raw.githubusercontent.com/plyush1993/qry4ms/refs/heads/main/app.R")
 shiny::shinyApp(ui, server)
