@@ -15,11 +15,44 @@ library(MsBackendMgf)
 library(MetaboCoreUtils)
 library(plotly)
 library(enviPat)
+library(shinycssloaders)
+library(Rdisop)
+library(InterpretMSSpectrum)
 
 data(isotopes, package = "enviPat")
 
 ui <- fluidPage(
   useShinyjs(),
+  
+  tags$head(tags$style(HTML("
+    /* 1. Make tabs wrap into several lines */
+    .nav-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      border-bottom: none;
+    }
+    .nav-tabs > li {
+      margin-bottom: 5px; /* Space between rows */
+    }
+    .nav-tabs > li > a {
+      font-size: 20px !important; /* Adjusted size for better wrapping */
+      font-weight: bold !important;
+      padding: 10px 20px !important; /* Smaller padding to fit more per line */
+      margin-right: 5px;
+      border: 1px solid #ddd !important;
+      border-radius: 4px !important;
+    }
+    .nav-tabs > li.active > a {
+      background-color: #0066cc !important;
+      color: white !important;
+    }
+    
+    /* Footer and other existing styles */
+    .app-footer { position: fixed; left:0; right:0; bottom:0; text-align:center; 
+                  font-size:12px; opacity:0.75; padding:8px; background: rgba(255,255,255,0.8);
+                  border-top: 1px solid #ddd; z-index: 9999; }
+    body { padding-bottom: 45px; }
+  "))),
   
 tags$head(tags$style(HTML("
   .app-footer { position: fixed; left:0; right:0; bottom:0; 
@@ -99,19 +132,6 @@ div(
       font-weight: bold;
     }
   "))),
-  
-  tags$head(
-    tags$style(HTML("
-      .nav-tabs > li > a {
-        font-size: 20px !important;
-        font-weight: bold !important;
-        padding: 12px 180px !important;
-      }
-      .nav-tabs > li.active > a {
-        font-size: 22px !important;
-      }
-    "))
-  ),
   
   theme = shinytheme("flatly"), 
   setBackgroundColor(color = c("azure", "azure"), gradient = "linear", direction = "bottom"),
@@ -225,12 +245,12 @@ div(
         mainPanel(
         tabsetPanel(
         tabPanel("MS1 spectrum",
-                 uiOutput("ms1_plot_ui"), 
+                 uiOutput("ms1_plot_ui")%>% withSpinner(color="#0066cc"), 
                  br(), br(),  
                  DTOutput("ms1_table")                      
         ),
         tabPanel("MS2 spectrum",
-                 uiOutput("ms2_plot_ui"), 
+                 uiOutput("ms2_plot_ui")%>% withSpinner(color="#0066cc"), 
                  br(), br(),  
                  DTOutput("ms2_table")
         ),
@@ -246,10 +266,10 @@ div(
                    "Reference spectrum is taken from the CSV uploaded in the sidebar (columns: 'mz', 'intensity', optionally 'rt')."
                  ),
                  br(), br(),
-                 uiOutput("mirror_plot_ui") 
+                 uiOutput("mirror_plot_ui") %>% withSpinner(color="#8B1A1A")
         ),
         tabPanel("Raw .ms text", verbatimTextOutput("preview_ms")),
-        tabPanel("Envipat",
+        tabPanel("Isotopic Pattern",
                  br(),
                  wellPanel(
                    fluidRow(
@@ -275,7 +295,7 @@ div(
                      )
                    )
                  ),
-                 plotlyOutput("envipat_plot", height = "500px")
+                 plotlyOutput("envipat_plot", height = "500px") %>% withSpinner()
         ),
         tabPanel("Adduct Calculator",
          br(),
@@ -286,8 +306,57 @@ div(
                         inline = TRUE),
            #helpText("If 'Adduct' is selected, the neutral mass is first calculated based on your charge (Positive = [M+H]+, Negative = [M-H]-).")
          ),
-         DTOutput("adduct_table")
+         fluidRow(
+           column(12, 
+                  div(style = "display: flex; align-items: center; justify-content: center; margin-bottom: 15px;",
+                      tags$b("Calculated Neutral Mass (M): ", style = "margin-right: 10px; font-size: 18px; color: #0066cc;"),
+                      textInput("neutral_mass_display", label = NULL, value = "", width = "150px"),
+                      actionButton("copy_neutral_mass", "Copy", icon = icon("clipboard"), 
+                                   style = "margin-left: 10px; margin-bottom: 15px; background-color: #0066cc; color: white;")
+                  )
+           )
+         ),
+         DTOutput("adduct_table") %>% withSpinner()
+),
+
+tabPanel("Formula Finder",
+         br(),
+         wellPanel(
+           fluidRow(
+             column(3, numericInput("rdisop_mass", "Neutral Mass:", value = 180.063388, step = 0.0001)),
+             column(3, numericInput("rdisop_ppm", "PPM Tolerance:", value = 5, min = 0.1)),
+             column(6, textInput("rdisop_elements_custom", "Allowed Elements (comma separated):", 
+                                 value = "C, H, N, O, P, S"))
+           ),
+           actionButton("run_rdisop", "Generate Formulas", class = "btn-primary", width = "100%")
+         ),
+         DTOutput("rdisop_table") %>% withSpinner()
+),
+
+tabPanel("Interpret MS1",
+br(),
+         wellPanel(
+           fluidRow(
+             column(8, 
+                    p(tags$b("About:"), "This algorithm evaluates MS1 clusters to propose the most likely neutral mass and identifies adducts/isotopes automatically."),
+             ),
+             column(2, 
+                    actionButton("run_findmain", "Run", 
+                                 class = "btn-warning", style = "margin-top:25px; width:100%; font-weight:bold;"))
+           )
+         ),
+         fluidRow(
+           column(12, 
+                  h4("Proposed Adducts & Neutral Mass"),
+                  plotOutput("fm_plot_main", height = "400px") %>% withSpinner(color="#0066cc")
+           )
+         ),
+         hr(),
+         h4("Calculation Summary"),
+         DTOutput("fm_summary_table")
 )
+
+
       )
     )
   )
@@ -945,20 +1014,6 @@ ms1_filtered <- reactive({
     mono_mz <- min(iso_df$mz_adduct)
     updateTextInput(session, "mono_mass_out", value = sprintf("%.6f", mono_mz))
     
-    observeEvent(input$copy_mass, {
-    req(input$mono_mass_out) # Make sure there is actually a number to copy
-    
-    # Run a quick JavaScript command to select and copy the text
-    shinyjs::runjs("
-      var copyText = document.getElementById('mono_mass_out');
-      copyText.select();
-      document.execCommand('copy');
-    ")
-    
-    # Pop up a temporary success message in the bottom right corner!
-    showNotification("Monoisotopic mass copied to clipboard!", type = "message", duration = 3)
-  })
-    
     # 5. Render interactive Plotly plot
     p <- plot_ly(iso_df) %>%
       add_segments(
@@ -995,17 +1050,51 @@ ms1_filtered <- reactive({
     p
   }) %>% bindEvent(input$calc_envipat)
   
+  observeEvent(input$copy_mass, {
+    req(input$mono_mass_out) # Make sure there is actually a number to copy
+    
+    # Run a quick JavaScript command to select and copy the text
+    shinyjs::runjs("
+      var copyText = document.getElementById('mono_mass_out');
+      copyText.select();
+      document.execCommand('copy');
+    ")
+    
+    # Pop up a temporary success message in the bottom right corner!
+    showNotification("Monoisotopic mass copied to clipboard!", type = "message", duration = 3)
+  })
+  
   # Reactive to calculate the neutral mass (M)
+  # 1. Update the reactive to also update the UI display
   neutral_mass <- reactive({
     req(input$parent_mass, input$charge)
-    if (input$input_type == "neutral") {
-      return(as.numeric(input$parent_mass))
+    
+    m_val <- if (input$input_type == "neutral") {
+      as.numeric(input$parent_mass)
     } else {
       # Back-calculate M from the assumed [M+H]+ or [M-H]-
       add_type <- if (input$charge > 0) "[M+H]+" else "[M-H]-"
-      val <- MetaboCoreUtils::mz2mass(input$parent_mass, add_type)
-      return(as.numeric(val))
+      as.numeric(MetaboCoreUtils::mz2mass(input$parent_mass, add_type))
     }
+    
+    # Update the text input field automatically
+    updateTextInput(session, "neutral_mass_display", value = sprintf("%.6f", m_val))
+    
+    return(m_val)
+  })
+
+  # 2. Add the Copy Logic for the Adduct Tab
+  observeEvent(input$copy_neutral_mass, {
+    req(input$neutral_mass_display)
+    
+    # Use shinyjs to select and copy
+    shinyjs::runjs("
+      var copyText = document.getElementById('neutral_mass_display');
+      copyText.select();
+      document.execCommand('copy');
+    ")
+    
+    showNotification("Neutral mass copied to clipboard!", type = "message", duration = 3)
   })
 
   # Generate the Adduct Table with custom sorting
@@ -1062,6 +1151,93 @@ ms1_filtered <- reactive({
     ) %>%
       formatRound(columns = "mz", digits = 6)
   })
+  
+  # --- Rdisop: Formula Finder Logic ---
+  observeEvent(input$sync_rdisop, {
+    updateNumericInput(session, "rdisop_mass", value = input$parent_mass)
+  })
+  
+rdisop_results <- eventReactive(input$run_rdisop, {
+  req(input$rdisop_mass, input$rdisop_elements_custom)
+  
+  # Parse the comma-separated string into a clean vector
+  elem_vec <- strsplit(input$rdisop_elements_custom, ",")[[1]]
+  elem_vec <- trimws(elem_vec) # Remove extra spaces
+  elem_vec <- elem_vec[elem_vec != ""] # Remove empty strings
+  
+  # Initialize elements dynamically
+  elem_list <- tryCatch({
+    initializeElements(elem_vec)
+  }, error = function(e) {
+    showNotification("Invalid element symbol detected. Please use standard symbols (e.g., Cl, Fe, Br).", type = "error")
+    return(NULL)
+  })
+  
+  req(elem_list)
+  
+  # Decompose mass
+  res <- decomposeMass(input$rdisop_mass, ppm = input$rdisop_ppm, elements = elem_list)
+  
+  validate(need(!is.null(res$formula), "No formulas found within this tolerance and element set."))
+  
+  # Build and sort Table
+  df <- data.frame(
+    Formula   = res$formula,
+    ExactMass = res$exactmass,
+    Error_PPM = abs((res$exactmass - input$rdisop_mass) / input$rdisop_mass) * 1e6,
+    stringsAsFactors = FALSE
+  )
+  df[order(df$Error_PPM), ]
+})
+
+output$rdisop_table <- renderDT({
+  datatable(rdisop_results(), rownames = FALSE, 
+            options = list(pageLength = 10, dom = 'tip')) %>%
+    formatRound(columns = c("ExactMass", "Error_PPM"), digits = 5)
+})
+
+# 1. Execute findMAIN algorithm on button click
+  fm_results <- eventReactive(input$run_findmain, {
+    df <- ms1_filtered()
+    validate(need(nrow(df) > 0, "No MS1 data found. Please paste or upload MS1 peaks first."))
+    
+    # findMAIN requires a two-column matrix (mz, intensity)
+    spec_matrix <- as.matrix(df[, c("mz", "intensity")])
+    
+    # Run the core algorithm from InterpretMSSpectrum
+    fmr <- InterpretMSSpectrum::findMAIN(spec_matrix)
+    return(fmr)
+  })
+
+  # 2. Render the findMAIN diagnostic plot
+  output$fm_plot_main <- renderPlot({
+    req(fm_results())
+    # The plot method for findMAIN objects shows the mass clusters and proposed M+H / Adducts
+    plot(fm_results())
+  })
+
+  # 3. Render the summary table (Neutral Mass, Score, Adducts)
+  output$fm_summary_table <- renderDT({
+    req(fm_results())
+    
+    # summary() on a findMAIN object returns a data frame of the top hypotheses
+    summ <- as.data.frame(print(fm_results()))
+    
+    if ("intensity" %in% colnames(summ)) {
+      summ <- summ[order(summ$intensity, decreasing = TRUE), ]
+    }
+    
+    datatable(
+      summ, 
+      rownames = FALSE,
+      options = list(
+        scrollX = TRUE, 
+        pageLength = 10,
+        columnDefs = list(list(className = 'dt-center', targets = "_all"))
+      )
+    )
+  })
+  
   
 }
 
