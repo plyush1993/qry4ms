@@ -5,10 +5,12 @@ The [`Shiny App`](https://shiny.posit.co/) for making an MS query:
 - Generates an individual .ms or .mgf file from user-provided MS spectra in MS1 & MS2 levels for a single compound. Spectra can be provided in .txt or pasted directly from the clipboard.
 - Generated .ms / .mgf files were tested in [`SIRIUS`](https://bio.informatik.uni-jena.de/software/sirius/), and [`NIST MS Search`](https://chemdata.nist.gov/mass-spc/ms-search/).
 - Filters by precursor mass and relative abundance, which provides a tidy formatting for the search query in MS fragmentation libraries.
+- Static/Interactive MS1 & MS2 spectra.
 - Builds a mirror plot from the reference spectra.
 - Computes Isotopic Pattern Distribution and Monoisotopic Mass for chemical formula based on [`envipat`](https://cran.r-project.org/web/packages/enviPat/index.html).
 - Calculates Adducts Map based on [`MetaboCoreUtils`](https://www.bioconductor.org/packages/release/bioc/html/MetaboCoreUtils.html).
-- Static/Interactive MS1 & MS2 spectra.
+- Generates Molecular Formula based on [`Rdisop`](https://bioconductor.org/packages/release/bioc/html/Rdisop.html).
+- Interprets MS1 spectra based on [`InterpretMSSpectrum`](https://cran.r-project.org/web/packages/InterpretMSSpectrum/index.html).
 
 ### Launch the App :rocket:
 Shiny deployment:<br>
