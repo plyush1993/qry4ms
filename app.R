@@ -326,7 +326,7 @@ tabPanel("Formula Finder",
              column(3, numericInput("rdisop_mass", "Neutral Mass:", value = 180.063388, step = 0.0001)),
              column(3, numericInput("rdisop_ppm", "PPM Tolerance:", value = 5, min = 0.1)),
              column(6, textInput("rdisop_elements_custom", "Allowed Elements (comma separated):", 
-                                 value = "C, H, N, O, P, S"))
+                                 value = "C, H, N, O"))
            ),
            actionButton("run_rdisop", "Generate Formulas", class = "btn-primary", width = "100%")
          ),
