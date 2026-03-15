@@ -47,6 +47,26 @@ ui <- fluidPage(
       color: white !important;
     }
     
+    /* Shrink the box to fit the content and reduce padding */
+.highlight-mini {
+  background-color: #FFFFFF;
+  border: 1px solid #ccc;
+  color: black;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-weight: bold;
+  display: inline-block; /* This makes the box only as wide as the text */
+  margin-top: 5px;
+  box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Reduce spacing between lines in the mass error panels */
+.mass-err-label {
+  margin-bottom: 2px;
+  font-size: 13px;
+  color: #555;
+}
+    
     /* Footer and other existing styles */
     .app-footer { position: fixed; left:0; right:0; bottom:0; text-align:center; 
                   font-size:12px; opacity:0.75; padding:8px; background: rgba(255,255,255,0.8);
@@ -323,7 +343,10 @@ tabPanel("Formula Finder",
          br(),
          wellPanel(
            fluidRow(
-             column(3, numericInput("rdisop_mass", "Neutral Mass:", value = 180.063388, step = 0.0001)),
+             column(3, 
+                div(style = "display: flex; align-items: flex-end;",
+                  numericInput("rdisop_mass", "Neutral Mass:", value = 180.063388, step = 0.0001))
+              ),
              column(3, numericInput("rdisop_ppm", "PPM Tolerance:", value = 5, min = 0.1)),
              column(6, textInput("rdisop_elements_custom", "Allowed Elements (comma separated):", 
                                  value = "C, H, N, O"))
@@ -354,6 +377,50 @@ br(),
          hr(),
          h4("Calculation Summary"),
          DTOutput("fm_summary_table")
+),
+
+  tabPanel("Mass Error",
+         br(),
+         fluidRow(
+           # Panel A: Range Calculator
+           column(6, 
+                  wellPanel(
+                    style = "border-left: 5px solid #0066cc; padding: 15px;",
+                    h4("1. Tolerance Range Calculator"),
+                    fluidRow(
+                      column(6, numericInput("range_m", "Target m/z:", value = 270.14407, step = 0.0001)),
+                      column(6, numericInput("range_ppm", "Tolerance (ppm):", value = 5, min = 0))
+                    ),
+                    hr(style = "margin: 10px 0;"),
+                    # Tightened outputs
+                    div(class = "mass-err-label", tags$b("Lower Bound:")),
+                    div(class = "highlight-mini", textOutput("res_lower", inline = TRUE)),
+                    
+                    div(class = "mass-err-label", style="margin-top:10px;", tags$b("Upper Bound:")),
+                    div(class = "highlight-mini", textOutput("res_upper", inline = TRUE)),
+                    
+                    div(class = "mass-err-label", style="margin-top:10px;", tags$b("Total Delta (Da):")),
+                    div(class = "highlight-mini", style="border-color: #0066cc;", textOutput("res_delta", inline = TRUE))
+                  )
+           ),
+           # Panel B: PPM Error Calculator
+           column(6, 
+                  wellPanel(
+                    style = "border-left: 5px solid #e74c3c; padding: 15px;",
+                    h4("2. Specific PPM Error"),
+                    numericInput("obs_mass", "Observed m/z:", value = 270.14407, step = 0.0001),
+                    numericInput("theo_mass", "Theoretical m/z:", value = 270.14352, step = 0.0001),
+                    hr(style = "margin: 10px 0;"),
+                    div(style = "text-align: center;",
+                        div(class = "mass-err-label", tags$b("Calculated Error:")),
+                        div(class = "highlight-mini", 
+                            style = "border: 2px solid #e74c3c; font-size: 18px;", 
+                            textOutput("res_ppm_err", inline = TRUE)
+                        )
+                    )
+                  )
+           )
+         )
 )
 
 
@@ -1153,10 +1220,7 @@ ms1_filtered <- reactive({
   })
   
   # --- Rdisop: Formula Finder Logic ---
-  observeEvent(input$sync_rdisop, {
-    updateNumericInput(session, "rdisop_mass", value = input$parent_mass)
-  })
-  
+
 rdisop_results <- eventReactive(input$run_rdisop, {
   req(input$rdisop_mass, input$rdisop_elements_custom)
   
@@ -1238,6 +1302,38 @@ output$rdisop_table <- renderDT({
     )
   })
   
+  output$res_lower <- renderText({
+    req(input$range_m, input$range_ppm)
+    sprintf("%.6f", input$range_m * (1 - input$range_ppm / 1e6))
+  })
+  
+  output$res_upper <- renderText({
+    req(input$range_m, input$range_ppm)
+    sprintf("%.6f", input$range_m * (1 + input$range_ppm / 1e6))
+  })
+  
+  output$res_delta <- renderText({
+    req(input$range_m, input$range_ppm)
+    sprintf("%.6f", (input$range_m * (input$range_ppm / 1e6)) * 2)
+  })
+  
+  # 2. Specific PPM Error Calculation
+  output$res_ppm_err <- renderText({
+    req(input$obs_mass, input$theo_mass)
+    err <- ((input$obs_mass - input$theo_mass) / input$theo_mass) * 1e6
+    paste0(round(err, 3), " ppm")
+  })
+  
+  # Sync for Formula Finder
+observeEvent(input$sync_rdisop, {
+  updateNumericInput(session, "rdisop_mass", value = input$parent_mass)
+})
+
+observe({
+  updateNumericInput(session, "rdisop_mass", value = input$parent_mass)
+  updateNumericInput(session, "range_m", value = input$parent_mass)
+})
+
   
 }
 
