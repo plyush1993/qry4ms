@@ -11,6 +11,7 @@ The [`Shiny App`](https://shiny.posit.co/) for making an MS query:
 - Calculates Adducts Map based on [`MetaboCoreUtils`](https://www.bioconductor.org/packages/release/bioc/html/MetaboCoreUtils.html).
 - Generates Molecular Formula based on [`Rdisop`](https://bioconductor.org/packages/release/bioc/html/Rdisop.html).
 - Interprets MS1 spectra based on [`InterpretMSSpectrum`](https://cran.r-project.org/web/packages/InterpretMSSpectrum/index.html).
+- Calculates Mass Error.
 
 ### Launch the App :rocket:
 Shiny deployment:<br>
