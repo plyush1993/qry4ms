@@ -24,6 +24,7 @@ pacman::p_load("shiny", "DT", "ggplot2", "shinythemes", "shinyWidgets", "shinyjs
 if (!requireNamespace("Spectra", quietly = TRUE)) BiocManager::install("Spectra")
 if (!requireNamespace("MsBackendMgf", quietly = TRUE)) BiocManager::install("MsBackendMgf")
 if (!requireNamespace("MetaboCoreUtils", quietly = TRUE)) BiocManager::install("MetaboCoreUtils")
+if (!requireNamespace("MsCoreUtils", quietly = TRUE)) BiocManager::install("MsCoreUtils")
 if (!requireNamespace("Rdisop", quietly = TRUE)) BiocManager::install("Rdisop")
 
 source("https://raw.githubusercontent.com/plyush1993/qry4ms/refs/heads/main/app.R")
