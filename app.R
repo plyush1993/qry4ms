@@ -259,7 +259,7 @@ div(
       fileInput("spectra_file", "", accept = ".csv"),
      
       hr(),
-      downloadButton("download_ms", "Download .ms file", class = "btn-info"),
+      downloadButton("download_ms", "Download .ms file", class = "btn-success"),
      br(), br(),
      downloadButton("download_mgf", "Download .mgf file", class = "btn-success")
     ),
@@ -339,20 +339,25 @@ div(
                 "[M+H]+"     = "[M+H]+",
                 "[M+Na]+"    = "[M+Na]+",
                 "[M+K]+"     = "[M+K]+",
+                "[M+NH4]+"   = "[M+NH4]+",
                 "M+"         = "M+",
                 "[M+2H]2+"   = "[M+2H]2+",
                 "[2M+H]+"    = "[2M+H]+",
                 "[M+2Na]2+"  = "[M+2Na]2+",
                 "[M+2K]2+"   = "[M+2K]2+",
                 "[M+H+K]2+"  = "[M+H+K]2+",
-                "[M+H+Na]2+" = "[M+H+Na]2+"
+                "[M+H+Na]2+" = "[M+H+Na]2+",
+                "[M+ACN+H]+" = "[M+ACN+H]+"
               ),
               "Negative Adducts" = c(
                 "[M-H]-"     = "[M-H]-",
                 "[M+Cl]-"    = "[M+Cl]-",
+                "[M+Br]-"    = "[M+Br]-",
                 "M-"         = "M-",
                 "[M-2H]2-"   = "[M-2H]2-",
-                "[2M-H]-"    = "[2M-H]-"
+                "[2M-H]-"    = "[2M-H]-",
+                "[M+FA-H]-"  = "[M+FA-H]-",  
+                "[M+Hac-H]-" = "[M+Hac-H]-"
               )
             ))),
                      column(3, numericInput("envipat_threshold", "Rel. Abundance Threshold (%):", 
@@ -389,10 +394,10 @@ div(
          fluidRow(
            column(12, 
                   div(style = "display: flex; align-items: center; justify-content: center; margin-bottom: 15px;",
-                      tags$b("Calculated Neutral Mass (M): ", style = "margin-right: 10px; font-size: 18px; color: #0066cc;"),
+                      tags$b("Calculated Neutral Mass (M): ", style = "margin-right: 10px; font-size: 18px; color: #2c3e50;"),
                       textInput("neutral_mass_display", label = NULL, value = "", width = "150px"),
                       actionButton("copy_neutral_mass", "Copy", icon = icon("clipboard"), 
-                                   style = "margin-left: 10px; margin-bottom: 15px; background-color: #0066cc; color: white;")
+                                   style = "margin-left: 10px; margin-bottom: 15px; background-color: #2c3e50; color: white;")
                   )
            )
          ),
@@ -414,7 +419,9 @@ tabPanel("Formula Finder",
            tags$small("Calculation is based on the Rdisop R package."),
            br(),
            br(),
-           actionButton("run_rdisop", "Generate Formulas", class = "btn-primary", width = "100%")
+           div(style = "text-align: center;",
+            actionButton("run_rdisop", "Generate Formulas", class = "btn-info", width = "30%")
+            )
          ),
          DTOutput("rdisop_table") %>% withSpinner()
 ),
@@ -423,12 +430,24 @@ tabPanel("Interpret MS1",
 br(),
          wellPanel(
            fluidRow(
-             column(8, 
-                    p(tags$b("About:"), "This algorithm evaluates MS1 clusters to propose the most likely neutral mass and identifies adducts/isotopes automatically. Calculation is based on the InterpretMSSpectrum R package."),
+             column(4, 
+                    p(tags$b("About:"), "This algorithm evaluates MS1 specta clusters to propose the most likely neutral mass and identifies adducts/isotopes automatically. Calculation is based on the InterpretMSSpectrum R package."),
+             ),
+             column(3, 
+                    radioButtons("fm_ionmode", "Ion Mode:", 
+                                 choices = c("Positive" = "positive", "Negative" = "negative"), 
+                                 inline = TRUE)
              ),
              column(2, 
-                    actionButton("run_findmain", "Run", 
-                                 class = "btn-warning", style = "margin-top:25px; width:100%; font-weight:bold;"))
+                    numericInput("fm_ppm", "PPM Tol:", value = 5, min = 0.1, step = 1)
+             ),
+             column(2, 
+                    numericInput("fm_abs", "Da Tol:", value = 0.01, min = 0.000001, step = 0.001)
+             ),
+             column(2, 
+                    div(style = "text-align: center;", actionButton("run_findmain", "Run", 
+                                 class = "btn-info", style = "margin-top:25px; width:100%; font-weight:bold;"))
+             )
            )
          ),
          fluidRow(
@@ -1099,6 +1118,10 @@ ms1_filtered <- reactive({
     form_adj <- enviPat::mergeform(base_formula, "Na1"); charge <- 1
   } else if (adduct == "[M+K]+") {
     form_adj <- enviPat::mergeform(base_formula, "K1"); charge <- 1
+  } else if (adduct == "[M+NH4]+") {
+  form_adj <- enviPat::mergeform(base_formula, "N1H4"); charge <- 1
+  } else if (adduct == "[M+ACN+H]+") {
+  form_adj <- enviPat::mergeform(base_formula, "C2H4N1"); charge <- 1
   } else if (adduct == "M+") {
     form_adj <- base_formula; charge <- 1
   } else if (adduct == "[M-H]-") {
@@ -1106,6 +1129,8 @@ ms1_filtered <- reactive({
     form_adj <- enviPat::subform(base_formula, "H1"); charge <- -1
   } else if (adduct == "[M+Cl]-") {
     form_adj <- enviPat::mergeform(base_formula, "Cl1"); charge <- -1
+  } else if (adduct == "[M+Br]-") {
+    form_adj <- enviPat::mergeform(base_formula, "Br1"); charge <- -1
   } else if (adduct == "M-") {
     form_adj <- base_formula; charge <- -1
   } else if (adduct == "[M-2H]2-") {
@@ -1125,6 +1150,10 @@ ms1_filtered <- reactive({
     form_adj <- enviPat::mergeform(base_formula, "K2"); charge <- 2
   } else if (adduct == "[M+H+K]2+") {
     form_adj <- enviPat::mergeform(base_formula, "H1K1"); charge <- 2
+  } else if (adduct == "[M+FA-H]-") {
+  form_adj <- enviPat::mergeform(base_formula, "C1H1O2"); charge <- -1
+  } else if (adduct == "[M+Hac-H]-") {
+  form_adj <- enviPat::mergeform(base_formula, "C2H3O2"); charge <- -1
   } else if (adduct == "[M+H+Na]2+") {
     form_adj <- enviPat::mergeform(base_formula, "H1Na1"); charge <- 2
   } else { 
@@ -1342,7 +1371,12 @@ output$rdisop_table <- renderDT({
     spec_matrix <- as.matrix(df[, c("mz", "intensity")])
     
     # Run the core algorithm from InterpretMSSpectrum
-    fmr <- InterpretMSSpectrum::findMAIN(spec_matrix)
+    fmr <- InterpretMSSpectrum::findMAIN(
+      spec_matrix, 
+      ionmode = input$fm_ionmode,
+      mzabs = input$fm_abs,
+      ppm = input$fm_ppm
+    )
     return(fmr)
   })
 
