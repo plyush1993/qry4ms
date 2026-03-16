@@ -333,9 +333,28 @@ div(
                  wellPanel(
                    fluidRow(
                      column(3, textInput("envipat_formula", "Formula:", value = "C15H10O7")),
-                     column(3, selectInput("envipat_adduct", "Adduct & Polarity:", 
-                                           choices = c("[M+H]+", "M+", "[M+Na]+", "[M+K]+", "M-", "[M-H]-", "[M+Cl]-"), 
-                                           selected = "[M+H]+")),
+                     column(3, selectInput("envipat_adduct", "Select Adduct:",
+            choices = list(
+              "Positive Adducts" = c(
+                "[M+H]+"     = "[M+H]+",
+                "[M+Na]+"    = "[M+Na]+",
+                "[M+K]+"     = "[M+K]+",
+                "M+"         = "M+",
+                "[M+2H]2+"   = "[M+2H]2+",
+                "[2M+H]+"    = "[2M+H]+",
+                "[M+2Na]2+"  = "[M+2Na]2+",
+                "[M+2K]2+"   = "[M+2K]2+",
+                "[M+H+K]2+"  = "[M+H+K]2+",
+                "[M+H+Na]2+" = "[M+H+Na]2+"
+              ),
+              "Negative Adducts" = c(
+                "[M-H]-"     = "[M-H]-",
+                "[M+Cl]-"    = "[M+Cl]-",
+                "M-"         = "M-",
+                "[M-2H]2-"   = "[M-2H]2-",
+                "[2M-H]-"    = "[2M-H]-"
+              )
+            ))),
                      column(3, numericInput("envipat_threshold", "Rel. Abundance Threshold (%):", 
                                             value = 0.1, min = 0, step = 0.1)),
                      column(3, actionButton("calc_envipat", "Run", 
@@ -1083,26 +1102,52 @@ ms1_filtered <- reactive({
   } else if (adduct == "M+") {
     form_adj <- base_formula; charge <- 1
   } else if (adduct == "[M-H]-") {
-    validate(need(grepl("H", base_formula), "No Hydrogen to lose!")); form_adj <- enviPat::subform(base_formula, "H1"); charge <- -1
+    validate(need(grepl("H", base_formula), "No Hydrogen to lose!"))
+    form_adj <- enviPat::subform(base_formula, "H1"); charge <- -1
   } else if (adduct == "[M+Cl]-") {
     form_adj <- enviPat::mergeform(base_formula, "Cl1"); charge <- -1
   } else if (adduct == "M-") {
     form_adj <- base_formula; charge <- -1
-  } else { stop("Adduct not supported.") }
+  } else if (adduct == "[M-2H]2-") {
+    validate(need(grepl("H", base_formula), "No Hydrogen to lose!"))
+    form_adj <- enviPat::subform(base_formula, "H2"); charge <- -2
+  } else if (adduct == "[2M-H]-") {
+    form_adj <- enviPat::multiform(base_formula, 2)
+    form_adj <- enviPat::subform(form_adj, "H1"); charge <- -1
+  } else if (adduct == "[M+2H]2+") {
+    form_adj <- enviPat::mergeform(base_formula, "H2"); charge <- 2
+  } else if (adduct == "[2M+H]+") {
+    form_adj <- enviPat::multiform(base_formula, 2)
+    form_adj <- enviPat::mergeform(form_adj, "H1"); charge <- 1
+  } else if (adduct == "[M+2Na]2+") {
+    form_adj <- enviPat::mergeform(base_formula, "Na2"); charge <- 2
+  } else if (adduct == "[M+2K]2+") {
+    form_adj <- enviPat::mergeform(base_formula, "K2"); charge <- 2
+  } else if (adduct == "[M+H+K]2+") {
+    form_adj <- enviPat::mergeform(base_formula, "H1K1"); charge <- 2
+  } else if (adduct == "[M+H+Na]2+") {
+    form_adj <- enviPat::mergeform(base_formula, "H1Na1"); charge <- 2
+  } else { 
+    stop("Adduct not supported.") 
+  }
   
   checked_form <- enviPat::check_chemform(isotopes, form_adj)
+  m_theory <- checked_form$monoisotopic_mass
+  theoretical_mz <- (m_theory - (charge * 0.00054858)) / abs(charge)
+  
   validate(need(!checked_form$warning, "Invalid chemical formula."))
   
-  pattern <- enviPat::isopattern(isotopes, checked_form$new_formula, threshold = threshold, plotit = FALSE, verbose = FALSE)
+  pattern <- enviPat::isopattern(isotopes, checked_form$new_formula, threshold = threshold, plotit = FALSE, verbose = FALSE, emass = 0.00054858, charge = charge) # , emass = 0.00054858, charge = charge, algo = 1
   iso_df <- as.data.frame(pattern[[1]])
   
   # --- ELECTRON & ADDUCT CORRECTION ---
-  mass_electron <- 0.0005485799
-  iso_df$mz_adduct <- (iso_df$`m/z` - (charge * mass_electron)) / abs(charge)
+  #iso_df$mz_adduct <- (iso_df$`m/z` - (charge * mass_electron)) / abs(charge)
+  iso_df$mz_adduct <- iso_df$`m/z`
   iso_df$abundance_pct <- iso_df$abundance
   
   # Return everything needed for plot, table, and UI update
-  list(df = iso_df, mono = checked_form$monoisotopic_mass, base = base_formula, add = adduct)
+  # Define mono: min(iso_df$mz_adduct) OR checked_form$monoisotopic_mass
+  list(df = iso_df, mono = theoretical_mz, base = base_formula, add = adduct)
 }) %>% bindEvent(input$calc_envipat)
   
   output$envipat_plot <- renderPlotly({
@@ -1126,7 +1171,7 @@ ms1_filtered <- reactive({
     layout(
       title = list(text = paste0("<b>Theoretical Isotopic Pattern</b><br>",
                                  "Formula: ", res$base, " | Adduct: ", res$add, "<br>",
-                                 "Monoisotopic m/z: ", round(res$mono, 5)), font = list(size = 14)),
+                                 "Monoisotopic m/z: ", round(res$mono, 4)), font = list(size = 14)),
       xaxis = list(title = "<b>m/z</b>", zeroline = FALSE, tickformat = ".4f"),
       yaxis = list(title = "<b>Relative Abundance (%)</b>", range = c(0, 105), zeroline = TRUE),
       hovermode = "closest", plot_bgcolor = "white", paper_bgcolor = "white"
