@@ -354,7 +354,9 @@ div(
                      )
                    )
                  ),
-                 plotlyOutput("envipat_plot", height = "500px") %>% withSpinner()
+                 plotlyOutput("envipat_plot", height = "500px") %>% withSpinner(),
+                 br(),
+                 DTOutput("envipat_table")
         ),
         tabPanel("Adduct Calculator",
          br(),
@@ -1058,106 +1060,86 @@ ms1_filtered <- reactive({
   })
   
   # envipat
+  envipat_results <- reactive({
+  req(input$envipat_formula, input$envipat_adduct)
+  
+  base_formula <- trimws(input$envipat_formula)
+  adduct <- input$envipat_adduct
+  threshold <- input$envipat_threshold
+
+  validate(need(nzchar(base_formula), "Please enter a valid chemical formula."))
+  checked_base <- enviPat::check_chemform(isotopes, base_formula)
+  validate(
+    need(checked_base$warning == FALSE, 
+         paste("Invalid chemical formula:", checked_base$new_formula))
+  )
+  
+  if (adduct == "[M+H]+") {
+    form_adj <- enviPat::mergeform(base_formula, "H1"); charge <- 1
+  } else if (adduct == "[M+Na]+") {
+    form_adj <- enviPat::mergeform(base_formula, "Na1"); charge <- 1
+  } else if (adduct == "[M+K]+") {
+    form_adj <- enviPat::mergeform(base_formula, "K1"); charge <- 1
+  } else if (adduct == "M+") {
+    form_adj <- base_formula; charge <- 1
+  } else if (adduct == "[M-H]-") {
+    validate(need(grepl("H", base_formula), "No Hydrogen to lose!")); form_adj <- enviPat::subform(base_formula, "H1"); charge <- -1
+  } else if (adduct == "[M+Cl]-") {
+    form_adj <- enviPat::mergeform(base_formula, "Cl1"); charge <- -1
+  } else if (adduct == "M-") {
+    form_adj <- base_formula; charge <- -1
+  } else { stop("Adduct not supported.") }
+  
+  checked_form <- enviPat::check_chemform(isotopes, form_adj)
+  validate(need(!checked_form$warning, "Invalid chemical formula."))
+  
+  pattern <- enviPat::isopattern(isotopes, checked_form$new_formula, threshold = threshold, plotit = FALSE, verbose = FALSE)
+  iso_df <- as.data.frame(pattern[[1]])
+  
+  # --- ELECTRON & ADDUCT CORRECTION ---
+  mass_electron <- 0.0005485799
+  iso_df$mz_adduct <- (iso_df$`m/z` - (charge * mass_electron)) / abs(charge)
+  iso_df$abundance_pct <- iso_df$abundance
+  
+  # Return everything needed for plot, table, and UI update
+  list(df = iso_df, mono = checked_form$monoisotopic_mass, base = base_formula, add = adduct)
+}) %>% bindEvent(input$calc_envipat)
+  
   output$envipat_plot <- renderPlotly({
-    req(input$envipat_formula, input$envipat_adduct)
-    
-    base_formula <- trimws(input$envipat_formula)
-    adduct <- input$envipat_adduct
-    threshold <- input$envipat_threshold
-    
-    # Validate that formula isn't empty
-    validate(need(nzchar(base_formula), "Please enter a chemical formula."))
-    
-    # 1. Modify formula based on adduct
-    if (adduct == "[M+H]+") {
-      form_adj <- enviPat::mergeform(base_formula, "H1")
-      charge <- 1
-    } else if (adduct == "[M+Na]+") {
-      form_adj <- enviPat::mergeform(base_formula, "Na1")
-      charge <- 1
-    } else if (adduct == "[M+K]+") {
-      form_adj <- enviPat::mergeform(base_formula, "K1")
-      charge <- 1
-    } else if (adduct == "M+") {
-      # No atoms added or removed!
-      form_adj <- base_formula 
-      charge <- 1
-    } else if (adduct == "[M-H]-") {
-      # Need to make sure the formula actually has an H to lose!
-      validate(need(grepl("H", base_formula), "Cannot form [M-H]- because the formula has no Hydrogen!"))
-      form_adj <- enviPat::subform(base_formula, "H1")
-      charge <- -1
-    } else if (adduct == "[M+Cl]-") {
-      form_adj <- enviPat::mergeform(base_formula, "Cl1")
-      charge <- -1
-    } else if (adduct == "M-") {
-      # No atoms added or removed!
-      form_adj <- base_formula 
-      charge <- -1
-    } else {
-      stop("Adduct not supported.")
-    }
-    
-    # 2. Check formula validity safely
-    checked_form <- enviPat::check_chemform(isotopes, form_adj)
-    validate(
-      need(!checked_form$warning, "Invalid chemical formula. Check your capitalization (e.g., 'Cl' not 'cl').")
+  res <- envipat_results()
+  updateTextInput(session, "mono_mass_out", value = sprintf("%.6f", res$mono))
+  
+  plot_ly(res$df) %>%
+    add_segments(
+      x = ~mz_adduct, xend = ~mz_adduct,
+      y = 0, yend = ~abundance_pct,
+      line = list(color = "#2c3e50", width = 2),
+      showlegend = FALSE, hoverinfo = "none"
+    ) %>%
+    add_markers(
+      x = ~mz_adduct, y = ~abundance_pct,
+      marker = list(color = "#e74c3c", size = 8),
+      text = ~paste0("<b>m/z:</b> ", round(mz_adduct, 5), "<br>",
+                     "<b>Rel. Abundance:</b> ", round(abundance_pct, 2), "%"),
+      hoverinfo = "text", name = "Isotopologue"
+    ) %>%
+    layout(
+      title = list(text = paste0("<b>Theoretical Isotopic Pattern</b><br>",
+                                 "Formula: ", res$base, " | Adduct: ", res$add, "<br>",
+                                 "Monoisotopic m/z: ", round(res$mono, 5)), font = list(size = 14)),
+      xaxis = list(title = "<b>m/z</b>", zeroline = FALSE, tickformat = ".4f"),
+      yaxis = list(title = "<b>Relative Abundance (%)</b>", range = c(0, 105), zeroline = TRUE),
+      hovermode = "closest", plot_bgcolor = "white", paper_bgcolor = "white"
     )
-    
-    # 3. Calculate pattern
-    pattern <- enviPat::isopattern(
-      isotopes, 
-      chemforms = checked_form$new_formula, 
-      threshold = threshold, 
-      plotit = FALSE, 
-      verbose = FALSE
-    )
-    
-    iso_df <- as.data.frame(pattern[[1]])
-    
-    # 4. Correct for electron mass
-    mass_electron <- 0.0005485799
-    iso_df$mz_adduct <- (iso_df$`m/z` - (charge * mass_electron)) / abs(charge)
-    iso_df$abundance_pct <- iso_df$abundance
-    
-    mono_mz <- checked_form$monoisotopic_mass
-    updateTextInput(session, "mono_mass_out", value = sprintf("%.6f", mono_mz))
-    
-    # 5. Render interactive Plotly plot
-    p <- plot_ly(iso_df) %>%
-      add_segments(
-        x = ~mz_adduct, xend = ~mz_adduct,
-        y = 0, yend = ~abundance_pct,
-        line = list(color = "#2c3e50", width = 2),
-        showlegend = FALSE,
-        hoverinfo = "none"
-      ) %>%
-      add_markers(
-        x = ~mz_adduct, y = ~abundance_pct,
-        marker = list(color = "#e74c3c", size = 8),
-        text = ~paste0(
-          "<b>m/z:</b> ", round(mz_adduct, 5), "<br>",
-          "<b>Rel. Abundance:</b> ", round(abundance_pct, 2), "%"
-        ),
-        hoverinfo = "text",
-        name = "Isotopologue"
-      ) %>%
-      layout(
-        title = list(
-          text = paste0("<b>Theoretical Isotopic Pattern</b><br>",
-                        "Formula: ", base_formula, " | Adduct: ", adduct, "<br>",
-                        "Monoisotopic m/z: ", round(mono_mz, 5)),
-          font = list(size = 14)
-        ),
-        xaxis = list(title = "<b>m/z</b>", zeroline = FALSE, tickformat = ".4f"),
-        yaxis = list(title = "<b>Relative Abundance (%)</b>", range = c(0, 105), zeroline = TRUE),
-        hovermode = "closest",
-        plot_bgcolor = "white",
-        paper_bgcolor = "white"
-      )
-    
-    p
-  }) %>% bindEvent(input$calc_envipat)
+})
+  
+  output$envipat_table <- renderDT({
+  datatable(envipat_results()$df, 
+            extensions = 'Buttons',
+            rownames = FALSE,
+            options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel'))) %>%
+    formatRound(columns = names(envipat_results()$df), digits = 5)
+})
   
   observeEvent(input$copy_mass, {
     req(input$mono_mass_out) # Make sure there is actually a number to copy
@@ -1245,20 +1227,19 @@ ms1_filtered <- reactive({
     df_adducts <- df_adducts[order(df_adducts$n, df_adducts$z, df_adducts$mz), ]
     
     datatable(
-      df_adducts,
-      colnames = c("Adduct Type", "Calculated m/z", "Charge (z)", "Molecules (n)"),
-      rownames = FALSE,
-      options = list(
-        pageLength = 20, 
-        dom = '<"top"f>rt<"bottom"lp>',
-        columnDefs = list(list(className = 'dt-center', targets = 1:2))
-      ),
-      caption = htmltools::tags$caption(
-        style = 'caption-side: top; text-align: left; color: #0066cc; font-weight: bold; font-size: 16px;',
-        paste("Adduct Map for Neutral Mass (M) =", round(m, 6))
-      )
-    ) %>%
-      formatRound(columns = "mz", digits = 6)
+    df_adducts,
+    extensions = 'Buttons', # Added
+    colnames = c("Adduct Type", "Calculated m/z", "Charge (z)", "Molecules (n)"),
+    rownames = FALSE,
+    options = list(
+      dom = 'Bfrtip',        # Changed from '<"top"f>rt<"bottom"lp>'
+      buttons = c('copy', 'csv', 'excel'), # Added
+      pageLength = 20, 
+      columnDefs = list(list(className = 'dt-center', targets = 1:2))
+    ),
+    # ... (keep your caption) ...
+  ) %>% formatRound(columns = "mz", digits = 6)
+    
   })
   
   # --- Rdisop: Formula Finder Logic ---
@@ -1297,8 +1278,13 @@ rdisop_results <- eventReactive(input$run_rdisop, {
 })
 
 output$rdisop_table <- renderDT({
-  datatable(rdisop_results(), rownames = FALSE, 
-            options = list(pageLength = 10, dom = 'tip')) %>%
+  datatable(rdisop_results(), 
+            extensions = 'Buttons', # Added
+            rownames = FALSE, 
+            options = list(
+              dom = 'Bfrtip',        # Added (B = Buttons, f = Search)
+              buttons = c('copy', 'csv', 'excel'), # Added
+              pageLength = 10, scrollX = TRUE)) %>%
     formatRound(columns = c("ExactMass", "Error_PPM"), digits = 5)
 })
 
@@ -1334,14 +1320,17 @@ output$rdisop_table <- renderDT({
     }
     
     datatable(
-      summ, 
-      rownames = FALSE,
-      options = list(
-        scrollX = TRUE, 
-        pageLength = 10,
-        columnDefs = list(list(className = 'dt-center', targets = "_all"))
-      )
+    summ, 
+    extensions = 'Buttons', # Added
+    rownames = FALSE,
+    options = list(
+      dom = 'Bfrtip',        # Added
+      buttons = c('copy', 'csv', 'excel'), # Added
+      scrollX = TRUE, 
+      pageLength = 10,
+      columnDefs = list(list(className = 'dt-center', targets = "_all"))
     )
+  )
   })
   
   output$res_lower <- renderText({
