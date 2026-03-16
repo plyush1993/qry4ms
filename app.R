@@ -10,6 +10,7 @@ library(ggplot2)
 library(shinythemes)
 library(shinyWidgets)
 library(shinyjs)
+library(shinyBS)
 library(Spectra)
 library(MsBackendMgf)
 library(MetaboCoreUtils)
@@ -18,6 +19,7 @@ library(enviPat)
 library(shinycssloaders)
 library(Rdisop)
 library(InterpretMSSpectrum)
+library(MsCoreUtils)
 
 data(isotopes, package = "enviPat")
 
@@ -274,22 +276,59 @@ div(
                  br(), br(),  
                  DTOutput("ms2_table")
         ),
-        tabPanel("Mirror plot",
-                 br(),
-                 radioButtons(
-                   "mirror_source", "Use MS2:",
-                   choices = c("Filtered MS2 (after filters)" = "filtered",
-                               "Raw MS2 (before filters)"     = "raw"),
-                   inline = TRUE
-                 ),
-                 tags$small(
-                   "Reference spectrum is taken from the CSV uploaded in the sidebar (columns: 'mz', 'intensity', optionally 'rt')."
-                 ),
-                 br(), br(),
-                 uiOutput("mirror_plot_ui") %>% withSpinner(color="#8B1A1A")
+        tabPanel("Mirror & Similarity",
+        br(),
+         # Custom CSS to fix the alignment and spacing
+         tags$head(
+           tags$style(HTML("
+             .inline-input .form-group { display: flex; align-items: center; margin-bottom: 5px; }
+             .inline-input label { margin-right: 10px; margin-bottom: 0; white-space: nowrap; min-width: 90px; }
+             .stats-box { min-width: 120px !important; }
+             .sim-container { display: flex; justify-content: space-around; align-items: center; }
+           "))
+         ),
+         wellPanel(
+           fluidRow(
+             # Column 1: Source and PPM
+             column(3, 
+                    radioButtons("mirror_source", "Use MS2:", choices = c("Filtered" = "filtered", "Raw" = "raw"), inline = TRUE),
+                    numericInput("sim_ppm", "Match Tol (ppm):", value = 10, min = 0)
+             ),
+             # Column 2: Weights and Stats (Fixed Labels)
+             column(4, class = "inline-input",
+                    numericInput("sim_m", "m (mz weight):", value = 0, step = 0.1),
+                    numericInput("sim_n", "n (int weight):", value = 0.5, step = 0.1),
+                    div(style="display:flex; align-items:center;",
+                        tags$b("Matched/Total: ", style="margin-right:10px;"),
+                        div(class = "highlight-mini stats-box", textOutput("match_stats", inline = TRUE))
+                    )
+             ),
+             actionButton(inputId = "btn", 
+                label = "?", 
+                class = "btn-primary btn-s"),
+          bsTooltip("btn", 
+          title = "<b>For Dot Product calculation via <em>MsCoreUtils</em> package</b><br>Most commonly m = 0 and n = 0.5 are used<br>NIST Library Search uses m = 3 and n = 0.6<br>MassBank uses m = 2 and n = 0.5<br>", "right", trigger = "click", options = list(container = "body")
+          ),
+             # Column 3 & 4: Scores (Closer together)
+             column(5,
+                    div(class = "sim-container",
+                        div(style="text-align:center;",
+                            div(tags$b("GNPS Score")),
+                            div(class = "highlight-mini", style="border-color: #104E8B; width: 80px;", textOutput("sim_gnps"))
+                        ),
+                        div(style="text-align:center;",
+                            div(tags$b("Dot Product")),
+                            div(class = "highlight-mini", style="border-color: #8B1A1A; width: 80px;", textOutput("sim_dot"))
+                        )
+                    )
+             )
+           ),
+          tags$small("Calculation is based on the MsCoreUtils R package.")
+         ),
+         uiOutput("mirror_plot_ui") %>% withSpinner(color="#0066cc")
         ),
-        tabPanel("Raw .ms text", verbatimTextOutput("preview_ms")),
-        tabPanel("Isotopic Pattern",
+        tabPanel("Raw .ms", verbatimTextOutput("preview_ms")),
+        tabPanel("Mass & Pattern",
                  br(),
                  wellPanel(
                    fluidRow(
@@ -303,7 +342,7 @@ div(
                                             class = "btn-info", 
                                             style = "margin-top: 25px; width: 100%; font-weight: bold;"))
                    ),
-                   tags$small("Note: Type standard element symbols (e.g., C6H12O6). Case sensitive.")
+                   tags$small("Note: Type standard element symbols (e.g., C6H12O6). Case sensitive. Calculation is based on the envipat R package.")
                  ),
                  fluidRow(
                    column(12, 
@@ -324,7 +363,7 @@ div(
                         choices = c("Neutral mass (M)" = "neutral",
                                     "Adduct (M+H / M-H)" = "adduct"),
                         inline = TRUE),
-           #helpText("If 'Adduct' is selected, the neutral mass is first calculated based on your charge (Positive = [M+H]+, Negative = [M-H]-).")
+          helpText("Parent mass is defined in the left sidebar. Calculation is based on the MetaboCoreUtils R package.")
          ),
          fluidRow(
            column(12, 
@@ -351,6 +390,9 @@ tabPanel("Formula Finder",
              column(6, textInput("rdisop_elements_custom", "Allowed Elements (comma separated):", 
                                  value = "C, H, N, O"))
            ),
+           tags$small("Calculation is based on the Rdisop R package."),
+           br(),
+           br(),
            actionButton("run_rdisop", "Generate Formulas", class = "btn-primary", width = "100%")
          ),
          DTOutput("rdisop_table") %>% withSpinner()
@@ -361,7 +403,7 @@ br(),
          wellPanel(
            fluidRow(
              column(8, 
-                    p(tags$b("About:"), "This algorithm evaluates MS1 clusters to propose the most likely neutral mass and identifies adducts/isotopes automatically."),
+                    p(tags$b("About:"), "This algorithm evaluates MS1 clusters to propose the most likely neutral mass and identifies adducts/isotopes automatically. Calculation is based on the InterpretMSSpectrum R package."),
              ),
              column(2, 
                     actionButton("run_findmain", "Run", 
@@ -1078,7 +1120,7 @@ ms1_filtered <- reactive({
     iso_df$mz_adduct <- (iso_df$`m/z` - (charge * mass_electron)) / abs(charge)
     iso_df$abundance_pct <- iso_df$abundance
     
-    mono_mz <- min(iso_df$mz_adduct)
+    mono_mz <- checked_form$monoisotopic_mass
     updateTextInput(session, "mono_mass_out", value = sprintf("%.6f", mono_mz))
     
     # 5. Render interactive Plotly plot
@@ -1333,6 +1375,65 @@ observe({
   updateNumericInput(session, "rdisop_mass", value = input$parent_mass)
   updateNumericInput(session, "range_m", value = input$parent_mass)
 })
+
+# --- Similarity Calculations ---
+  
+  output$sim_gnps <- renderText({
+    req(ms2_for_mirror(), lib_ms2_data(), input$sim_ppm)
+    
+    x <- as.matrix(ms2_for_mirror()[, c("mz", "intensity")])
+    y <- as.matrix(lib_ms2_data()[, c("mz", "intensity")])
+    
+    # Direct mapping for GNPS as requested
+    map <- MsCoreUtils::join_gnps(x[, 1], y[, 1], tolerance = 0, ppm = input$sim_ppm)
+    
+    if (length(map[[1]]) == 0) return("0.000")
+    
+    # Calculate GNPS only on matched peaks
+    score <- MsCoreUtils::gnps(x[map[[1]], , drop=FALSE], y[map[[2]], , drop=FALSE])
+    
+    sprintf("%.3f", if(is.na(score)) 0 else score)
+  })
+  
+  output$sim_dot <- renderText({
+    req(ms2_for_mirror(), lib_ms2_data(), input$sim_m, input$sim_n, input$sim_ppm)
+    
+    x <- as.matrix(ms2_for_mirror()[, c("mz", "intensity")])
+    y <- as.matrix(lib_ms2_data()[, c("mz", "intensity")])
+    
+    # Alignment required for dot product to avoid "length" warning
+    joined <- MsCoreUtils::join(x[, 1], y[, 1], tolerance = 0, ppm = input$sim_ppm, type = "outer")
+    
+    # Reconstruct vectors (filling missing intensities with 0)
+    x_int <- x[joined$x, 2]; x_int[is.na(x_int)] <- 0
+    y_int <- y[joined$y, 2]; y_int[is.na(y_int)] <- 0
+    mz_aligned <- rowMeans(cbind(x[joined$x, 1], y[joined$y, 1]), na.rm = TRUE)
+    
+    score <- MsCoreUtils::ndotproduct(cbind(mz_aligned, x_int), 
+                                      cbind(mz_aligned, y_int), 
+                                      m = input$sim_m, n = input$sim_n)
+    
+    sprintf("%.3f", if(is.na(score)) 0 else score)
+  })
+
+  # --- Match Stats (using closest) ---
+  output$match_stats <- renderText({
+    req(ms2_for_mirror(), lib_ms2_data(), input$sim_ppm)
+    
+    samp_mz <- ms2_for_mirror()$mz
+    lib_mz <- lib_ms2_data()$mz
+    
+    # Find the index of the closest library peak for each sample peak
+    # tolerance = 0 because we are using ppm exclusively
+    closest_idx <- MsCoreUtils::closest(samp_mz, lib_mz, tolerance = 0, ppm = input$sim_ppm)
+    
+    # Count how many sample peaks successfully found a match (!is.na)
+    # We use unique() on the matches if you want to count how many LIB peaks were hit
+    matched <- sum(!is.na(closest_idx))
+    total <- length(lib_mz) 
+    
+    paste0(matched, " / ", total)
+  })
 
   
 }
