@@ -255,8 +255,8 @@ div(
       
      hr(),
       h4("Reference Spectra"),
-      tags$small("Upload reference spectrum as CSV with columns 'mz' and 'intensity'."),
-      fileInput("spectra_file", "", accept = ".csv"),
+      tags$small("Upload reference spectrum as txt/csv/tsv with m/z and intensity."),
+      fileInput("spectra_file", "", accept = c(".csv", ".txt", ".tsv")),
      
       hr(),
       downloadButton("download_ms", "Download .ms file", class = "btn-success"),
@@ -649,34 +649,48 @@ ms1_filtered <- reactive({
     df
   })
 
-    lib_ms2_data <- reactive({
-    validate(
-      need(input$spectra_file,
-           "Upload a reference MS2 CSV (with columns 'mz' and 'intensity') in the sidebar.")
-    )
-    
-    df <- tryCatch(
-      read.csv(input$spectra_file$datapath, stringsAsFactors = FALSE),
-      error = function(e) NULL
-    )
-    
-    validate(
-      need(!is.null(df), "Unable to read reference MS2 CSV. Check the file format."),
-      need(all(c("mz", "intensity") %in% names(df)),
-           "Reference CSV must contain columns named 'mz' and 'intensity'.")
-    )
-    
-    df <- df[, c("mz", "intensity"), drop = FALSE]
-    df$mz        <- suppressWarnings(as.numeric(df$mz))
-    df$intensity <- suppressWarnings(as.numeric(df$intensity))
-    
-    df <- df[is.finite(df$mz) & is.finite(df$intensity), , drop = FALSE]
-    validate(
-      need(nrow(df) > 0, "Reference MS2 spectrum is empty after cleaning. Check the CSV.")
-    )
-    
-    df
-  })
+  lib_ms2_data <- reactive({
+  validate(
+    need(input$spectra_file,
+         "Upload a reference MS2 file (txt/csv/tsv) in the sidebar.")
+  )
+  
+  # Check file extension
+  ext <- tolower(tools::file_ext(input$spectra_file$name))
+  
+  df <- tryCatch({
+    if (ext == "csv") {
+      read.csv(input$spectra_file$datapath, header = FALSE)
+    } else if (ext == "tsv") {
+      read.delim(input$spectra_file$datapath, header = FALSE)
+    } else {
+      # Fallback for .txt or other formats (handles spaces/tabs dynamically)
+      read.table(input$spectra_file$datapath, header = FALSE, fill = TRUE)
+    }
+  }, error = function(e) NULL)
+  
+  validate(
+    need(!is.null(df), "Unable to read reference MS2 file. Check the format."),
+    need(ncol(df) >= 2, "Reference file must have at least 2 columns: m/z and intensity.")
+  )
+  
+  # Grab the first two columns blindly (ignoring whatever the user named them)
+  df <- df[, 1:2, drop = FALSE]
+  colnames(df) <- c("mz", "intensity")
+  
+  # Force numeric and eat the headers/text
+  df$mz        <- suppressWarnings(as.numeric(df$mz))
+  df$intensity <- suppressWarnings(as.numeric(df$intensity))
+  
+  # Drop rows that became NA
+  df <- df[!is.na(df$mz) & !is.na(df$intensity), , drop = FALSE]
+  
+  validate(
+    need(nrow(df) > 0, "Reference MS2 spectrum is empty or invalid. Ensure numeric m/z and intensity values.")
+  )
+  
+  return(df)
+})
 
   mirror_data_prep <- reactive({
     df_s <- ms2_for_mirror()
