@@ -172,7 +172,22 @@ div(
                    value = 1, step = 1),
       
       hr(),
-      
+      h4("MS1 spectrum input"),
+      radioButtons(
+        "ms1_input_type", "MS1 input type:",
+        choices = c("Paste text" = "paste", "Upload txt/csv/tsv" = "upload"),
+        selected = "paste"
+      ),
+      conditionalPanel(
+        "input.ms1_input_type == 'paste'",
+        tags$small("Paste two columns: m/z intensity, separated by space or tab, one peak per line."),
+        textAreaInput("ms1_text", NULL, rows = 8, placeholder = "e.g.\n270.1440 12345\n269.1402 5678")
+      ),
+      conditionalPanel(
+        "input.ms1_input_type == 'upload'",
+        fileInput("ms1_file", "Upload MS1 file:",
+                  accept = c(".txt", ".csv", ".tsv"))
+      ),
       h4("MS1 filtering"),
       checkboxInput("filter_ms1",
                     "Enable MS1 filtering (parent mass +/- tolerance)",
@@ -195,25 +210,24 @@ div(
          ),
       
       hr(),
-      h4("MS1 spectrum input"),
+      h4("MS2 spectrum input"),
       radioButtons(
-        "ms1_input_type", "MS1 input type:",
+        "ms2_input_type", "MS2 input type:",
         choices = c("Paste text" = "paste", "Upload txt/csv/tsv" = "upload"),
         selected = "paste"
       ),
       conditionalPanel(
-        "input.ms1_input_type == 'paste'",
+        "input.ms2_input_type == 'paste'",
         tags$small("Paste two columns: m/z intensity, separated by space or tab, one peak per line."),
-        textAreaInput("ms1_text", NULL, rows = 8, placeholder = "e.g.\n270.1440 12345\n269.1402 5678")
+        textAreaInput("ms2_text", NULL, rows = 8, placeholder = "e.g.\n150.0712 5000\n120.0550 3000")
       ),
       conditionalPanel(
-        "input.ms1_input_type == 'upload'",
-        fileInput("ms1_file", "Upload MS1 file:",
+        "input.ms2_input_type == 'upload'",
+        fileInput("ms2_file", "Upload MS2 file:",
                   accept = c(".txt", ".csv", ".tsv"))
       ),
       
-      hr(),
-      h4("MS2 filtering"),
+     h4("MS2 filtering"),
       checkboxInput("filter_ms2",
                     "Filter MS2 by m/z (<= parent mass + tolerance)",
                     value = FALSE),
@@ -236,24 +250,6 @@ div(
       ),
       
       hr(),
-      h4("MS2 spectrum input"),
-      radioButtons(
-        "ms2_input_type", "MS2 input type:",
-        choices = c("Paste text" = "paste", "Upload txt/csv/tsv" = "upload"),
-        selected = "paste"
-      ),
-      conditionalPanel(
-        "input.ms2_input_type == 'paste'",
-        tags$small("Paste two columns: m/z intensity, separated by space or tab, one peak per line."),
-        textAreaInput("ms2_text", NULL, rows = 8, placeholder = "e.g.\n150.0712 5000\n120.0550 3000")
-      ),
-      conditionalPanel(
-        "input.ms2_input_type == 'upload'",
-        fileInput("ms2_file", "Upload MS2 file:",
-                  accept = c(".txt", ".csv", ".tsv"))
-      ),
-      
-     hr(),
       h4("Reference Spectra"),
       tags$small("Upload reference spectrum as txt/csv/tsv with m/z and intensity."),
       fileInput("spectra_file", "", accept = c(".csv", ".txt", ".tsv")),
