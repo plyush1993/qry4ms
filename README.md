@@ -14,26 +14,28 @@ The [`Shiny App`](https://shiny.posit.co/) for making an MS query:
 - Calculates Mass Error.
 
 ### Launch the App :rocket:
-Shiny deployment:<br>
+**Shiny deployment**<br>
 [**`https://plyush1993.shinyapps.io/qry4ms/`**](https://plyush1993.shinyapps.io/qry4ms/) <br><br>
-Run locally:
+**Run locally**<br>
+Install:
 ```r
-cat("Checking required packages (auto-installing if missing)\n")
-if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load("shiny", "DT", "ggplot2", "shinythemes", "shinyWidgets", "shinyjs", "shinyBS", "shinycssloaders", "BiocManager", "plotly", "enviPat", "InterpretMSSpectrum")
-if (!requireNamespace("Spectra", quietly = TRUE)) BiocManager::install("Spectra")
-if (!requireNamespace("MsBackendMgf", quietly = TRUE)) BiocManager::install("MsBackendMgf")
-if (!requireNamespace("MetaboCoreUtils", quietly = TRUE)) BiocManager::install("MetaboCoreUtils")
-if (!requireNamespace("MsCoreUtils", quietly = TRUE)) BiocManager::install("MsCoreUtils")
-if (!requireNamespace("Rdisop", quietly = TRUE)) BiocManager::install("Rdisop")
-
-source("https://raw.githubusercontent.com/plyush1993/qry4ms/refs/heads/main/app.R")
-shiny::shinyApp(ui, server)
+if (!require("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager")
+}
+if (!require("remotes", quietly = TRUE)) {
+    install.packages("remotes")
+}
+remotes::install_github("plyush1993/qry4ms", INSTALL_opts = "--no-multiarch")
+```
+Run:
+```r
+library(qry4ms)
+run_qry4ms()
 ```
 <br>
 
 > [!IMPORTANT]
->The [App's script](https://github.com/plyush1993/Metabocano/blob/main/app.R) was compiled using [R version 4.1.2](https://cran.r-project.org/bin/windows/base/old/4.1.2/) 
+>The [App's script](https://github.com/plyush1993/qry4ms/blob/main/app.R) was compiled using [R version 4.1.2](https://cran.r-project.org/bin/windows/base/old/4.1.2/) 
 <br>
 
 ### Contact :mailbox_with_mail:
