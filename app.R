@@ -513,7 +513,7 @@ br(),
 
 server <- function(input, output, session) {
   
-  parse_spectrum <- function(input_type, text_value, file_input, label = "MS") {
+ parse_spectrum <- function(input_type, text_value, file_input, label = "MS") {
 
     if (input_type == "paste") {
       validate(
@@ -525,7 +525,7 @@ server <- function(input, output, session) {
       con <- textConnection(text_value)
       on.exit(close(con), add = TRUE)
       df <- tryCatch(
-        read.table(con, header = FALSE),
+        read.table(con, header = FALSE, fill = TRUE),
         error = function(e) NULL
       )
     } else {
@@ -535,10 +535,17 @@ server <- function(input, output, session) {
           paste0("No ", label, " file uploaded. Please upload a txt/csv/tsv file.")
         )
       )
-      df <- tryCatch(
-        read.table(file_input$datapath, header = FALSE),
-        error = function(e) NULL
-      )
+      
+      # Check file extension to route to the correct reader
+      ext <- tolower(tools::file_ext(file_input$name))
+      
+      df <- tryCatch({
+        if (ext == "csv") {
+          read.csv(file_input$datapath, header = FALSE)
+        } else {
+          read.table(file_input$datapath, header = FALSE, fill = TRUE)
+        }
+      }, error = function(e) NULL)
     }
     
     validate(
@@ -549,11 +556,18 @@ server <- function(input, output, session) {
     df <- df[, 1:2, drop = FALSE]
     colnames(df) <- c("mz", "intensity")
     
+    # Force to numeric (this safely removes accidental text headers by turning them into NAs)
+    df$mz <- suppressWarnings(as.numeric(df$mz))
+    df$intensity <- suppressWarnings(as.numeric(df$intensity))
+    
+    # Drop any rows that became NA (headers, empty lines, text artifacts)
+    df <- df[!is.na(df$mz) & !is.na(df$intensity), , drop = FALSE]
+    
     validate(
-      need(nrow(df) > 0, paste0(label, " spectrum is empty. Check input or file."))
+      need(nrow(df) > 0, paste0(label, " spectrum is empty or invalid. Ensure numeric m/z and intensity values."))
     )
     
-    df
+    return(df)
   }
 
   ms1_data <- reactive({
