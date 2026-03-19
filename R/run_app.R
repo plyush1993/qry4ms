@@ -17,7 +17,7 @@ run_qry4ms <- function(...) {
 
   flush.console()
 
-  old_opts <- options(shiny.maxRequestSize = 5 * 1024^3)
+  old_opts <- options(shiny.maxRequestSize = 1 * 1024^3)
     on.exit({
     options(old_opts)
     gc()
