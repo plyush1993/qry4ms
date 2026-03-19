@@ -25,7 +25,8 @@ Imports:
     Spectra,
     MetaboCoreUtils,
     MsCoreUtils,
-    Rdisop
+    Rdisop,
+    crayon
 Remotes: 
     bioc::Spectra,
     bioc::MsBackendMgf,
