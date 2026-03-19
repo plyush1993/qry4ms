@@ -7,7 +7,6 @@
 run_qry4ms()
 }
 \description{
-Run the qry4ms Application
-
-Online version: https://plyush1993.shinyapps.io/qry4ms/
+Run the qry4ms Application locally. Shiny deployment
+\href{https://plyush1993.shinyapps.io/qry4ms/}{here}.
 }
