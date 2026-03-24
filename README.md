@@ -29,8 +29,7 @@ remotes::install_github("plyush1993/qry4ms", INSTALL_opts = "--no-multiarch")
 ```
 Run:
 ```r
-library(qry4ms)
-run_qry4ms()
+qry4ms::run_qry4ms()
 ```
 <br>
 
