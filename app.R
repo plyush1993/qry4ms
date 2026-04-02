@@ -957,12 +957,22 @@ ms1_filtered <- reactive({
         buttons = list(
           list(
             extend = "copy",
-            text   = "Copy All",
+            text   = "Copy",
             title  = NULL,
             header = FALSE,
             exportOptions = list(
               modifier = list(page = "all")
             )
+          ),
+          list(
+            extend = "copy",
+            text   = "Copy", 
+            title  = NULL,
+            header = FALSE,
+            exportOptions = list(
+              modifier = list(page = "all")
+            ),
+            customize = JS("function(data) { return data.replace(/\\t/g, ' ').trim(); }")
           ),
           list(
             extend = "csvHtml5",
@@ -1002,12 +1012,22 @@ ms1_filtered <- reactive({
         buttons = list(
           list(
             extend = "copy",
-            text   = "Copy All",
+            text   = "Copy",
             title  = NULL,
             header = FALSE,
             exportOptions = list(
               modifier = list(page = "all")
             )
+          ),
+          list(
+            extend = "copy",
+            text   = "Copy", 
+            title  = NULL,
+            header = FALSE,
+            exportOptions = list(
+              modifier = list(page = "all")
+            ),
+            customize = JS("function(data) { return data.replace(/\\t/g, ' ').trim(); }")
           ),
           list(
             extend = "csvHtml5",
