@@ -382,8 +382,8 @@ div(
          br(),
          wellPanel(
            radioButtons("input_type", "Parent mass is:",
-                        choices = c("Neutral mass (M)" = "neutral",
-                                    "Adduct (M+H / M-H)" = "adduct"),
+                        choices = c("Adduct (M+H / M-H)" = "adduct",
+                                    "Neutral mass (M)" = "neutral"),
                         inline = TRUE),
           helpText("Parent mass is defined in the left sidebar. Calculation is based on the MetaboCoreUtils R package.")
          ),
