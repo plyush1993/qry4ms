@@ -651,6 +651,7 @@ ms1_filtered <- reactive({
   # envipat
   envipat_results <- reactive({
   req(input$envipat_formula, input$envipat_adduct)
+  data("isotopes", package = "enviPat", envir = environment())
 
   base_formula <- trimws(input$envipat_formula)
   adduct <- input$envipat_adduct
@@ -663,50 +664,52 @@ ms1_filtered <- reactive({
          paste("Invalid chemical formula:", checked_base$new_formula))
   )
 
+  safe_formula <- checked_base$new_formula
+
   if (adduct == "[M+H]+") {
-    form_adj <- enviPat::mergeform(base_formula, "H1"); charge <- 1
+    form_adj <- enviPat::mergeform(safe_formula, "H1"); charge <- 1
   } else if (adduct == "[M+Na]+") {
-    form_adj <- enviPat::mergeform(base_formula, "Na1"); charge <- 1
+    form_adj <- enviPat::mergeform(safe_formula, "Na1"); charge <- 1
   } else if (adduct == "[M+K]+") {
-    form_adj <- enviPat::mergeform(base_formula, "K1"); charge <- 1
+    form_adj <- enviPat::mergeform(safe_formula, "K1"); charge <- 1
   } else if (adduct == "[M+NH4]+") {
-  form_adj <- enviPat::mergeform(base_formula, "N1H4"); charge <- 1
+  form_adj <- enviPat::mergeform(safe_formula, "N1H4"); charge <- 1
   } else if (adduct == "[M+ACN+H]+") {
-  form_adj <- enviPat::mergeform(base_formula, "C2H4N1"); charge <- 1
+  form_adj <- enviPat::mergeform(safe_formula, "C2H4N1"); charge <- 1
   } else if (adduct == "M+") {
-    form_adj <- base_formula; charge <- 1
+    form_adj <- safe_formula; charge <- 1
   } else if (adduct == "[M-H]-") {
-    validate(need(grepl("H", base_formula), "No Hydrogen to lose!"))
-    form_adj <- enviPat::subform(base_formula, "H1"); charge <- -1
+    validate(need(grepl("H", safe_formula), "No Hydrogen to lose!"))
+    form_adj <- enviPat::subform(safe_formula, "H1"); charge <- -1
   } else if (adduct == "[M+Cl]-") {
-    form_adj <- enviPat::mergeform(base_formula, "Cl1"); charge <- -1
+    form_adj <- enviPat::mergeform(safe_formula, "Cl1"); charge <- -1
   } else if (adduct == "[M+Br]-") {
-    form_adj <- enviPat::mergeform(base_formula, "Br1"); charge <- -1
+    form_adj <- enviPat::mergeform(safe_formula, "Br1"); charge <- -1
   } else if (adduct == "M-") {
-    form_adj <- base_formula; charge <- -1
+    form_adj <- safe_formula; charge <- -1
   } else if (adduct == "[M-2H]2-") {
-    validate(need(grepl("H", base_formula), "No Hydrogen to lose!"))
-    form_adj <- enviPat::subform(base_formula, "H2"); charge <- -2
+    validate(need(grepl("H", safe_formula), "No Hydrogen to lose!"))
+    form_adj <- enviPat::subform(safe_formula, "H2"); charge <- -2
   } else if (adduct == "[2M-H]-") {
-    form_adj <- enviPat::multiform(base_formula, 2)
+    form_adj <- enviPat::multiform(safe_formula, 2)
     form_adj <- enviPat::subform(form_adj, "H1"); charge <- -1
   } else if (adduct == "[M+2H]2+") {
-    form_adj <- enviPat::mergeform(base_formula, "H2"); charge <- 2
+    form_adj <- enviPat::mergeform(safe_formula, "H2"); charge <- 2
   } else if (adduct == "[2M+H]+") {
-    form_adj <- enviPat::multiform(base_formula, 2)
+    form_adj <- enviPat::multiform(safe_formula, 2)
     form_adj <- enviPat::mergeform(form_adj, "H1"); charge <- 1
   } else if (adduct == "[M+2Na]2+") {
-    form_adj <- enviPat::mergeform(base_formula, "Na2"); charge <- 2
+    form_adj <- enviPat::mergeform(safe_formula, "Na2"); charge <- 2
   } else if (adduct == "[M+2K]2+") {
-    form_adj <- enviPat::mergeform(base_formula, "K2"); charge <- 2
+    form_adj <- enviPat::mergeform(safe_formula, "K2"); charge <- 2
   } else if (adduct == "[M+H+K]2+") {
-    form_adj <- enviPat::mergeform(base_formula, "H1K1"); charge <- 2
+    form_adj <- enviPat::mergeform(safe_formula, "H1K1"); charge <- 2
   } else if (adduct == "[M+FA-H]-") {
-  form_adj <- enviPat::mergeform(base_formula, "C1H1O2"); charge <- -1
+  form_adj <- enviPat::mergeform(safe_formula, "C1H1O2"); charge <- -1
   } else if (adduct == "[M+Hac-H]-") {
-  form_adj <- enviPat::mergeform(base_formula, "C2H3O2"); charge <- -1
+  form_adj <- enviPat::mergeform(safe_formula, "C2H3O2"); charge <- -1
   } else if (adduct == "[M+H+Na]2+") {
-    form_adj <- enviPat::mergeform(base_formula, "H1Na1"); charge <- 2
+    form_adj <- enviPat::mergeform(safe_formula, "H1Na1"); charge <- 2
   } else {
     stop("Adduct not supported.")
   }
