@@ -1,1 +1,1 @@
-data(isotopes, package = "enviPat")
+data("isotopes", package = "enviPat", envir = environment())
