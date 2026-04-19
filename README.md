@@ -30,6 +30,11 @@ if (!require("remotes", quietly = TRUE)) {
 }
 remotes::install_github("plyush1993/qry4ms", INSTALL_opts = "--no-multiarch")
 ```
+or
+```r
+if (!requireNamespace("pak", quietly = TRUE)) install.packages("pak")
+pak::pak("plyush1993/qry4ms")
+```
 Run:
 ```r
 qry4ms::run_qry4ms()
