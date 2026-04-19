@@ -18,11 +18,14 @@ run_qry4ms <- function(...) {
   flush.console()
 
   old_opts <- options(shiny.maxRequestSize = 1 * 1024^3)
+
     on.exit({
     options(old_opts)
     gc()
     }, add = TRUE)
 
   shiny::addResourcePath("www", system.file("www", package = "qry4ms"))
-  shiny::shinyApp(ui = app_ui(), server = app_server, ...)
+
+  app <- shiny::shinyApp(ui = app_ui(), server = app_server)
+  shiny::runApp(app, ...)
 }
