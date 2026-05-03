@@ -370,7 +370,7 @@ div(
                         choices = c("Adduct (M+H / M-H)" = "adduct",
                                     "Neutral mass (M)" = "neutral"),
                         inline = TRUE),
-          helpText("Parent mass is defined in the left sidebar. Calculation is based on the MetaboCoreUtils R package.")
+          helpText("Parent mass & Charge are defined in the left sidebar. Calculation is based on the MetaboCoreUtils R package.")
          ),
          fluidRow(
            column(12,
