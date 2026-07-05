@@ -103,7 +103,7 @@ tags$head(tags$style(HTML("
 tags$head(
   tags$title("qry4ms"),
   tags$link(rel = "icon", type = "image/png",
-            href = "https://raw.githubusercontent.com/plyush1993/qry4ms/main/qry4ms.png")
+            href = "https://raw.githubusercontent.com/plyush1993/qry4ms/main/inst/www/qry4ms.png")
 ),
 
 div(
@@ -122,7 +122,7 @@ div(
   ",
   
   tags$img(
-    src = 'https://raw.githubusercontent.com/plyush1993/qry4ms/main/qry4ms.png',
+    src = 'https://raw.githubusercontent.com/plyush1993/qry4ms/main/inst/www/qry4ms.png',
     height = '150px',
     style = 'margin-right: 20px;'
   ),
