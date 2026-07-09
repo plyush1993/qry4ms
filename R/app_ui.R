@@ -272,9 +272,51 @@ div(
            fluidRow(
              # Column 1: Source and PPM
              column(3,
-                    radioButtons("mirror_source", "Use MS2:", choices = c("Filtered" = "filtered", "Raw" = "raw"), inline = TRUE),
-                    numericInput("sim_ppm", "Match Tol (ppm):", value = 10, min = 0)
-             ),
+       radioButtons(
+         "mirror_source",
+         "Use MS2:",
+         choices = c("Filtered" = "filtered", "Raw" = "raw"),
+         inline = TRUE
+       ),
+
+       radioButtons(
+         "sim_tol_unit",
+         "Match tolerance unit:",
+         choices = c("ppm" = "ppm", "Da" = "da"),
+         selected = "ppm",
+         inline = TRUE
+       ),
+
+       conditionalPanel(
+         condition = "input.sim_tol_unit == 'ppm'",
+         numericInput(
+           "sim_ppm",
+           "Match Tol (ppm):",
+           value = 10,
+           min = 0,
+           step = 1
+         )
+       ),
+
+       conditionalPanel(
+         condition = "input.sim_tol_unit == 'da'",
+         numericInput(
+           "sim_da",
+           "Match Tol (Da):",
+           value = 0.01,
+           min = 0,
+           step = 0.001
+         )
+       ),
+       prettyCheckbox(
+         "mirror_highlight_matches",
+         "Highlight matched peaks",
+         value = FALSE,
+         shape = "curve",
+         status = "primary",
+    animation = "pulse"
+       )
+),
              # Column 2: Weights and Stats (Fixed Labels)
              column(4, class = "inline-input",
                     numericInput("sim_m", "m (mz weight):", value = 0, step = 0.1),
@@ -306,7 +348,7 @@ div(
            ),
           tags$small("Calculation is based on the MsCoreUtils R package.")
          ),
-         uiOutput("mirror_plot_ui") %>% withSpinner(color="#0066cc")
+         uiOutput("mirror_plot_ui") %>% withSpinner(color="#0066cc"),
         ),
         tabPanel("Raw .ms", verbatimTextOutput("preview_ms")),
         tabPanel("Mass & Pattern",
@@ -451,9 +493,28 @@ br(),
                     style = "border-left: 5px solid #0066cc; padding: 15px;",
                     h4("1. Tolerance Range Calculator"),
                     fluidRow(
-                      column(6, numericInput("range_m", "Target m/z:", value = 270.14407, step = 0.0001)),
-                      column(6, numericInput("range_ppm", "Tolerance (ppm):", value = 5, min = 0))
-                    ),
+  column(6, numericInput("range_m", "Target m/z:", value = 270.14407, step = 0.0001)),
+  column(
+    6,
+    radioButtons(
+      "range_tol_unit",
+      "Tolerance unit:",
+      choices = c("ppm" = "ppm", "Da" = "da"),
+      selected = "ppm",
+      inline = TRUE
+    ),
+
+    conditionalPanel(
+      condition = "input.range_tol_unit == 'ppm'",
+      numericInput("range_ppm", "Tolerance (ppm):", value = 5, min = 0)
+    ),
+
+    conditionalPanel(
+      condition = "input.range_tol_unit == 'da'",
+      numericInput("range_da", "Tolerance (Da):", value = 0.01, min = 0, step = 0.001)
+    )
+  )
+),
                     hr(style = "margin: 10px 0;"),
                     # Tightened outputs
                     div(class = "mass-err-label", tags$b("Lower Bound:")),
@@ -470,9 +531,16 @@ br(),
            column(6,
                   wellPanel(
                     style = "border-left: 5px solid #e74c3c; padding: 15px;",
-                    h4("2. Specific PPM Error"),
+                    h4("2. Specific Mass Error"),
                     numericInput("obs_mass", "Observed m/z:", value = 270.14407, step = 0.0001),
                     numericInput("theo_mass", "Theoretical m/z:", value = 270.14352, step = 0.0001),
+                    radioButtons(
+  "err_unit",
+  "Error unit:",
+  choices = c("ppm" = "ppm", "Da" = "da"),
+  selected = "ppm",
+  inline = TRUE
+),
                     hr(style = "margin: 10px 0;"),
                     div(style = "text-align: center;",
                         div(class = "mass-err-label", tags$b("Calculated Error:")),
