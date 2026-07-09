@@ -287,9 +287,51 @@ div(
            fluidRow(
              # Column 1: Source and PPM
              column(3, 
-                    radioButtons("mirror_source", "Use MS2:", choices = c("Filtered" = "filtered", "Raw" = "raw"), inline = TRUE),
-                    numericInput("sim_ppm", "Match Tol (ppm):", value = 10, min = 0)
-             ),
+       radioButtons(
+         "mirror_source",
+         "Use MS2:",
+         choices = c("Filtered" = "filtered", "Raw" = "raw"),
+         inline = TRUE
+       ),
+
+       radioButtons(
+         "sim_tol_unit",
+         "Match tolerance unit:",
+         choices = c("ppm" = "ppm", "Da" = "da"),
+         selected = "ppm",
+         inline = TRUE
+       ),
+
+       conditionalPanel(
+         condition = "input.sim_tol_unit == 'ppm'",
+         numericInput(
+           "sim_ppm",
+           "Match Tol (ppm):",
+           value = 10,
+           min = 0,
+           step = 1
+         )
+       ),
+
+       conditionalPanel(
+         condition = "input.sim_tol_unit == 'da'",
+         numericInput(
+           "sim_da",
+           "Match Tol (Da):",
+           value = 0.01,
+           min = 0,
+           step = 0.001
+         )
+       ),
+       prettyCheckbox(
+         "mirror_highlight_matches",
+         "Highlight matched peaks",
+         value = FALSE,
+         shape = "curve",
+         status = "primary",
+    animation = "pulse"
+       )
+),
              # Column 2: Weights and Stats (Fixed Labels)
              column(4, class = "inline-input",
                     numericInput("sim_m", "m (mz weight):", value = 0, step = 0.1),
@@ -321,7 +363,7 @@ div(
            ),
           tags$small("Calculation is based on the MsCoreUtils R package.")
          ),
-         uiOutput("mirror_plot_ui") %>% withSpinner(color="#0066cc")
+         uiOutput("mirror_plot_ui") %>% withSpinner(color="#0066cc"),
         ),
         tabPanel("Raw .ms", verbatimTextOutput("preview_ms")),
         tabPanel("Mass & Pattern",
@@ -466,9 +508,28 @@ br(),
                     style = "border-left: 5px solid #0066cc; padding: 15px;",
                     h4("1. Tolerance Range Calculator"),
                     fluidRow(
-                      column(6, numericInput("range_m", "Target m/z:", value = 270.14407, step = 0.0001)),
-                      column(6, numericInput("range_ppm", "Tolerance (ppm):", value = 5, min = 0))
-                    ),
+  column(6, numericInput("range_m", "Target m/z:", value = 270.14407, step = 0.0001)),
+  column(
+    6,
+    radioButtons(
+      "range_tol_unit",
+      "Tolerance unit:",
+      choices = c("ppm" = "ppm", "Da" = "da"),
+      selected = "ppm",
+      inline = TRUE
+    ),
+
+    conditionalPanel(
+      condition = "input.range_tol_unit == 'ppm'",
+      numericInput("range_ppm", "Tolerance (ppm):", value = 5, min = 0)
+    ),
+
+    conditionalPanel(
+      condition = "input.range_tol_unit == 'da'",
+      numericInput("range_da", "Tolerance (Da):", value = 0.01, min = 0, step = 0.001)
+    )
+  )
+),
                     hr(style = "margin: 10px 0;"),
                     # Tightened outputs
                     div(class = "mass-err-label", tags$b("Lower Bound:")),
@@ -485,9 +546,16 @@ br(),
            column(6, 
                   wellPanel(
                     style = "border-left: 5px solid #e74c3c; padding: 15px;",
-                    h4("2. Specific PPM Error"),
+                    h4("2. Specific Mass Error"),
                     numericInput("obs_mass", "Observed m/z:", value = 270.14407, step = 0.0001),
                     numericInput("theo_mass", "Theoretical m/z:", value = 270.14352, step = 0.0001),
+                    radioButtons(
+  "err_unit",
+  "Error unit:",
+  choices = c("ppm" = "ppm", "Da" = "da"),
+  selected = "ppm",
+  inline = TRUE
+),
                     hr(style = "margin: 10px 0;"),
                     div(style = "text-align: center;",
                         div(class = "mass-err-label", tags$b("Calculated Error:")),
@@ -689,27 +757,32 @@ ms1_filtered <- reactive({
 })
 
   mirror_data_prep <- reactive({
-    df_s <- ms2_for_mirror()
-    validate(need(nrow(df_s) > 0, "MS2 spectrum has no peaks to show in mirror plot."))
-    df_ref <- lib_ms2_data()
-    
-    max_s   <- max(df_s$intensity,   na.rm = TRUE)
-    max_ref <- max(df_ref$intensity, na.rm = TRUE)
-    validate(
-      need(is.finite(max_s)   && max_s   > 0, "MS2 intensities are zero or NA."),
-      need(is.finite(max_ref) && max_ref > 0, "Reference MS2 intensities are zero or NA.")
-    )
-    
-    df_s$rel   <- 100 * df_s$intensity   / max_s
-    df_ref$rel <- 100 * df_ref$intensity / max_ref
-    df_ref$rel <- -df_ref$rel
-    
-    df_s$type   <- "Sample"
-    df_ref$type <- "Reference"
-    
-    rbind(df_s[, c("mz", "intensity", "rel", "type")], 
-          df_ref[, c("mz", "intensity", "rel", "type")])
-  })
+  df_s <- ms2_for_mirror()
+  validate(need(nrow(df_s) > 0, "MS2 spectrum has no peaks to show in mirror plot."))
+  df_ref <- lib_ms2_data()
+  
+  max_s   <- max(df_s$intensity,   na.rm = TRUE)
+  max_ref <- max(df_ref$intensity, na.rm = TRUE)
+  validate(
+    need(is.finite(max_s)   && max_s   > 0, "MS2 intensities are zero or NA."),
+    need(is.finite(max_ref) && max_ref > 0, "Reference MS2 intensities are zero or NA.")
+  )
+  
+  df_s$rel   <- 100 * df_s$intensity   / max_s
+  df_ref$rel <- 100 * df_ref$intensity / max_ref
+  df_ref$rel <- -df_ref$rel
+  
+  df_s$type   <- "Sample"
+  df_ref$type <- "Reference"
+  
+  if (!"rt" %in% colnames(df_ref)) df_ref$rt <- NA
+  if (!"rt" %in% colnames(df_s)) df_s$rt <- NA
+  
+  rbind(
+    df_s[, c("mz", "intensity", "rt", "rel", "type")],
+    df_ref[, c("mz", "intensity", "rt", "rel", "type")]
+  )
+})
     
   output$mirror_plot <- renderPlot({
   df_s <- ms2_for_mirror()
@@ -869,73 +942,219 @@ ms1_filtered <- reactive({
     }
   })
   
-  mirror_data_prep <- reactive({
-    df_s <- ms2_for_mirror()
-    validate(need(nrow(df_s) > 0, "MS2 spectrum has no peaks to show in mirror plot."))
-    df_ref <- lib_ms2_data()
-    
-    max_s   <- max(df_s$intensity,   na.rm = TRUE)
-    max_ref <- max(df_ref$intensity, na.rm = TRUE)
-    validate(
-      need(is.finite(max_s)   && max_s   > 0, "MS2 intensities are zero or NA."),
-      need(is.finite(max_ref) && max_ref > 0, "Reference MS2 intensities are zero or NA.")
+  sim_match_tolerance <- reactive({
+  unit <- input$sim_tol_unit
+
+  if (is.null(unit) || !nzchar(unit)) {
+    unit <- "ppm"
+  }
+
+  if (identical(unit, "da")) {
+    da <- suppressWarnings(as.numeric(input$sim_da))
+
+    if (is.null(da) || !is.finite(da) || da < 0) {
+      da <- 0.01
+    }
+
+    list(
+      tolerance = da,
+      ppm = 0,
+      label = paste0(da, " Da")
     )
-    
-    df_s$rel   <- 100 * df_s$intensity   / max_s
-    df_ref$rel <- 100 * df_ref$intensity / max_ref
-    df_ref$rel <- -df_ref$rel
-    
-    df_s$type   <- "Sample"
-    df_ref$type <- "Reference"
-    
-    # If reference lacks rt, make sure it binds cleanly
-    if(!"rt" %in% colnames(df_ref)) df_ref$rt <- NA
-    if(!"rt" %in% colnames(df_s)) df_s$rt <- NA
-    
-    rbind(df_s[, c("mz", "intensity", "rt", "rel", "type")], 
-          df_ref[, c("mz", "intensity", "rt", "rel", "type")])
-  })
+
+  } else {
+    ppm <- suppressWarnings(as.numeric(input$sim_ppm))
+
+    if (is.null(ppm) || !is.finite(ppm) || ppm < 0) {
+      ppm <- 10
+    }
+
+    list(
+      tolerance = 0,
+      ppm = ppm,
+      label = paste0(ppm, " ppm")
+    )
+  }
+})
+  
+  mirror_match_flags <- reactive({
+  req(ms2_for_mirror(), lib_ms2_data())
+
+  df_s <- ms2_for_mirror()
+  df_ref <- lib_ms2_data()
+
+  samp_mz <- suppressWarnings(as.numeric(df_s$mz))
+  ref_mz  <- suppressWarnings(as.numeric(df_ref$mz))
+
+  tol <- sim_match_tolerance()
+
+  # sample peak matched to reference?
+  s_to_r <- MsCoreUtils::closest(
+    samp_mz,
+    ref_mz,
+    tolerance = tol$tolerance,
+    ppm = tol$ppm
+  )
+
+  # reference peak matched to sample?
+  r_to_s <- MsCoreUtils::closest(
+    ref_mz,
+    samp_mz,
+    tolerance = tol$tolerance,
+    ppm = tol$ppm
+  )
+
+  list(
+    sample_matched = !is.na(s_to_r),
+    ref_matched    = !is.na(r_to_s)
+  )
+})
+  
+  mirror_data_prep <- reactive({
+  df_s <- ms2_for_mirror()
+  validate(need(nrow(df_s) > 0, "MS2 spectrum has no peaks to show in mirror plot."))
+  df_ref <- lib_ms2_data()
+
+  max_s   <- max(df_s$intensity,   na.rm = TRUE)
+  max_ref <- max(df_ref$intensity, na.rm = TRUE)
+
+  validate(
+    need(is.finite(max_s)   && max_s   > 0, "MS2 intensities are zero or NA."),
+    need(is.finite(max_ref) && max_ref > 0, "Reference MS2 intensities are zero or NA.")
+  )
+
+  df_s$rel   <- 100 * df_s$intensity   / max_s
+  df_ref$rel <- 100 * df_ref$intensity / max_ref
+  df_ref$rel <- -df_ref$rel
+
+  df_s$type   <- "Sample"
+  df_ref$type <- "Reference"
+
+  if (!"rt" %in% colnames(df_ref)) df_ref$rt <- NA
+  if (!"rt" %in% colnames(df_s)) df_s$rt <- NA
+
+  # default: all fully visible
+  df_s$alpha_val   <- 1
+  df_ref$alpha_val <- 1
+
+  # optional highlighting
+  if (isTRUE(input$mirror_highlight_matches)) {
+    m <- mirror_match_flags()
+
+    df_s$alpha_val   <- ifelse(m$sample_matched, 1.0, 0.2)
+    df_ref$alpha_val <- ifelse(m$ref_matched,    1.0, 0.2)
+  }
+
+  rbind(
+    df_s[, c("mz", "intensity", "rt", "rel", "type", "alpha_val")],
+    df_ref[, c("mz", "intensity", "rt", "rel", "type", "alpha_val")]
+  )
+})
 
   # --- MIRROR PLOTS ---
   output$mirror_plot_static <- renderPlot({
-    df_all <- mirror_data_prep()
-    ggplot(df_all, aes(x = mz, xend = mz, y = 0, yend = rel, color = type)) +
-      geom_segment(size = 0.8) +
-      scale_color_manual(name = "Spectrum", values = c("Sample" = "#104E8B", "Reference" = "#8B1A1A")) +
-      scale_y_continuous("Relative intensity (%)", labels = abs) +
-      labs(x = "m/z", title = "Mirror spectrum") +
-      theme_minimal(base_size = 16) + theme(legend.position = "bottom")
-  })
+  df_all <- mirror_data_prep()
+
+  ggplot(df_all, aes(x = mz, xend = mz, y = 0, yend = rel, color = type, alpha = alpha_val)) +
+    geom_segment(size = 0.8) +
+    scale_color_manual(
+      name = "Spectrum",
+      values = c("Sample" = "#104E8B", "Reference" = "#8B1A1A")
+    ) +
+    scale_alpha_identity() +
+    scale_y_continuous("Relative intensity (%)", labels = abs) +
+    labs(
+      x = "m/z",
+      title = paste0("Mirror spectrum | match tolerance: ", sim_match_tolerance()$label)
+    ) +
+    theme_minimal(base_size = 16) +
+    theme(legend.position = "bottom")
+})
   
   output$mirror_plot_plotly <- renderPlotly({
-    df_all <- mirror_data_prep()
-    
-    df_all$mz <- as.numeric(df_all$mz)
-    df_all$intensity <- as.numeric(df_all$intensity)
-    df_all$rel <- as.numeric(df_all$rel)
-    
-    df_s <- df_all[df_all$type == "Sample", ]
-    df_ref <- df_all[df_all$type == "Reference", ]
-    
-    df_s$hover_txt <- paste0("<b>m/z:</b> ", round(df_s$mz, 4), 
-                             "<br><b>Rel Int:</b> ", round(df_s$rel, 1), "%",
-                             "<br><b>Abs Int:</b> ", round(df_s$intensity, 1))
-                             
-    df_ref$hover_txt <- paste0("<b>m/z:</b> ", round(df_ref$mz, 4), 
-                               "<br><b>Rel Int:</b> ", round(abs(df_ref$rel), 1), "%",
-                               "<br><b>Abs Int:</b> ", round(df_ref$intensity, 1))
-    
-    plot_ly() %>%
-      add_segments(data = df_s, x = ~mz, xend = ~mz, y = 0, yend = ~rel, line = list(color = "#104E8B"), hoverinfo="none", name="Sample") %>%
-      add_markers(data = df_s, x = ~mz, y = ~rel, marker = list(color = "#104E8B", size = 4),
-                  text = ~hover_txt, hoverinfo = "text", name = "Sample") %>%
-      add_segments(data = df_ref, x = ~mz, xend = ~mz, y = 0, yend = ~rel, line = list(color = "#8B1A1A"), hoverinfo="none", name="Reference") %>%
-      add_markers(data = df_ref, x = ~mz, y = ~rel, marker = list(color = "#8B1A1A", size = 4),
-                  text = ~hover_txt, hoverinfo = "text", name = "Reference") %>%
-      layout(title = "Mirror spectrum", xaxis = list(title = "m/z"), 
-             yaxis = list(title = "Relative intensity (%)", tickmode = "array", tickvals = seq(-100, 100, 25), ticktext = abs(seq(-100, 100, 25))),
-             hovermode = "closest")
-  })
+  df_all <- mirror_data_prep()
+
+  df_all$mz <- as.numeric(df_all$mz)
+  df_all$intensity <- as.numeric(df_all$intensity)
+  df_all$rel <- as.numeric(df_all$rel)
+
+  df_s <- df_all[df_all$type == "Sample", ]
+  df_ref <- df_all[df_all$type == "Reference", ]
+
+  df_s$hover_txt <- paste0(
+    "<b>m/z:</b> ", round(df_s$mz, 4),
+    "<br><b>Rel Int:</b> ", round(df_s$rel, 1), "%",
+    "<br><b>Abs Int:</b> ", round(df_s$intensity, 1)
+  )
+
+  df_ref$hover_txt <- paste0(
+    "<b>m/z:</b> ", round(df_ref$mz, 4),
+    "<br><b>Rel Int:</b> ", round(abs(df_ref$rel), 1), "%",
+    "<br><b>Abs Int:</b> ", round(df_ref$intensity, 1)
+  )
+
+  if (isTRUE(input$mirror_highlight_matches)) {
+    df_s_full <- df_s[df_s$alpha_val == 1.0, , drop = FALSE]
+    df_s_fade <- df_s[df_s$alpha_val < 1.0, , drop = FALSE]
+
+    df_r_full <- df_ref[df_ref$alpha_val == 1.0, , drop = FALSE]
+    df_r_fade <- df_ref[df_ref$alpha_val < 1.0, , drop = FALSE]
+  } else {
+    df_s_full <- df_s
+    df_s_fade <- df_s[0, , drop = FALSE]
+
+    df_r_full <- df_ref
+    df_r_fade <- df_ref[0, , drop = FALSE]
+  }
+
+  add_trace_block <- function(p, dat, col, nm, opacity = 1) {
+    if (!nrow(dat)) return(p)
+
+    p %>%
+      add_segments(
+        data = dat,
+        x = ~mz, xend = ~mz,
+        y = 0, yend = ~rel,
+        line = list(color = col, width = 2),
+        opacity = opacity,
+        hoverinfo = "none",
+        name = nm,
+        showlegend = FALSE
+      ) %>%
+      add_markers(
+        data = dat,
+        x = ~mz,
+        y = ~rel,
+        marker = list(color = col, size = 4),
+        opacity = opacity,
+        text = ~hover_txt,
+        hoverinfo = "text",
+        name = nm,
+        showlegend = FALSE
+      )
+  }
+
+  p <- plot_ly()
+
+  p <- add_trace_block(p, df_s_fade, "#104E8B", "Sample", opacity = 0.2)
+  p <- add_trace_block(p, df_r_fade, "#8B1A1A", "Reference", opacity = 0.2)
+
+  p <- add_trace_block(p, df_s_full, "#104E8B", "Sample", opacity = 1.0)
+  p <- add_trace_block(p, df_r_full, "#8B1A1A", "Reference", opacity = 1.0)
+
+  p %>%
+    layout(
+      title = paste0("Mirror spectrum | match tolerance: ", sim_match_tolerance()$label),
+      xaxis = list(title = "m/z"),
+      yaxis = list(
+        title = "Relative intensity (%)",
+        tickmode = "array",
+        tickvals = seq(-100, 100, 25),
+        ticktext = abs(seq(-100, 100, 25))
+      ),
+      hovermode = "closest"
+    )
+})
   
   output$ms1_table <- renderDT({
     df <- ms1_filtered()
@@ -1459,27 +1678,80 @@ output$rdisop_table <- renderDT({
   )
   })
   
-  output$res_lower <- renderText({
-    req(input$range_m, input$range_ppm)
-    sprintf("%.6f", input$range_m * (1 - input$range_ppm / 1e6))
-  })
-  
-  output$res_upper <- renderText({
-    req(input$range_m, input$range_ppm)
-    sprintf("%.6f", input$range_m * (1 + input$range_ppm / 1e6))
-  })
-  
-  output$res_delta <- renderText({
-    req(input$range_m, input$range_ppm)
-    sprintf("%.6f", (input$range_m * (input$range_ppm / 1e6)) * 2)
-  })
+  range_mass_window <- reactive({
+  req(input$range_m)
+
+  mz <- suppressWarnings(as.numeric(input$range_m))
+  validate(need(is.finite(mz), "Target m/z must be numeric."))
+
+  unit <- input$range_tol_unit
+  if (is.null(unit) || !nzchar(unit)) {
+    unit <- "ppm"
+  }
+
+  if (identical(unit, "da")) {
+    da <- suppressWarnings(as.numeric(input$range_da))
+
+    if (is.null(da) || !is.finite(da) || da < 0) {
+      da <- 0.01
+    }
+
+    delta_one_side <- da
+
+  } else {
+    ppm <- suppressWarnings(as.numeric(input$range_ppm))
+
+    if (is.null(ppm) || !is.finite(ppm) || ppm < 0) {
+      ppm <- 5
+    }
+
+    delta_one_side <- mz * ppm / 1e6
+  }
+
+  list(
+    lower = mz - delta_one_side,
+    upper = mz + delta_one_side,
+    delta = 2 * delta_one_side
+  )
+})
+
+output$res_lower <- renderText({
+  sprintf("%.6f", range_mass_window()$lower)
+})
+
+output$res_upper <- renderText({
+  sprintf("%.6f", range_mass_window()$upper)
+})
+
+output$res_delta <- renderText({
+  sprintf("%.6f", range_mass_window()$delta)
+})
   
   # 2. Specific PPM Error Calculation
   output$res_ppm_err <- renderText({
-    req(input$obs_mass, input$theo_mass)
-    err <- ((input$obs_mass - input$theo_mass) / input$theo_mass) * 1e6
+  req(input$obs_mass, input$theo_mass)
+
+  obs <- suppressWarnings(as.numeric(input$obs_mass))
+  theo <- suppressWarnings(as.numeric(input$theo_mass))
+
+  validate(
+    need(is.finite(obs), "Observed m/z must be numeric."),
+    need(is.finite(theo) && theo != 0, "Theoretical m/z must be numeric and non-zero.")
+  )
+
+  unit <- input$err_unit
+  if (is.null(unit) || !nzchar(unit)) {
+    unit <- "ppm"
+  }
+
+  if (identical(unit, "da")) {
+    err <- obs - theo
+    paste0(round(err, 6), " Da")
+  } else {
+    err <- ((obs - theo) / theo) * 1e6
     paste0(round(err, 3), " ppm")
-  })
+  }
+})
   
   # Sync for Formula Finder
 observeEvent(input$sync_rdisop, {
@@ -1494,63 +1766,89 @@ observe({
 # --- Similarity Calculations ---
   
   output$sim_gnps <- renderText({
-    req(ms2_for_mirror(), lib_ms2_data(), input$sim_ppm)
-    
-    x <- as.matrix(ms2_for_mirror()[, c("mz", "intensity")])
-    y <- as.matrix(lib_ms2_data()[, c("mz", "intensity")])
-    
-    # Direct mapping for GNPS as requested
-    map <- MsCoreUtils::join_gnps(x[, 1], y[, 1], tolerance = 0, ppm = input$sim_ppm)
-    
-    if (length(map[[1]]) == 0) return("0.000")
-    
-    # Calculate GNPS only on matched peaks
-    score <- MsCoreUtils::gnps(x[map[[1]], , drop=FALSE], y[map[[2]], , drop=FALSE])
-    
-    sprintf("%.3f", if(is.na(score)) 0 else score)
-  })
+  req(ms2_for_mirror(), lib_ms2_data())
+
+  x <- as.matrix(ms2_for_mirror()[, c("mz", "intensity")])
+  y <- as.matrix(lib_ms2_data()[, c("mz", "intensity")])
+
+  tol <- sim_match_tolerance()
+
+  map <- MsCoreUtils::join_gnps(
+    x[, 1],
+    y[, 1],
+    tolerance = tol$tolerance,
+    ppm = tol$ppm
+  )
+
+  if (length(map[[1]]) == 0) return("0.000")
+
+  score <- MsCoreUtils::gnps(
+    x[map[[1]], , drop = FALSE],
+    y[map[[2]], , drop = FALSE]
+  )
+
+  sprintf("%.3f", if (is.na(score)) 0 else score)
+})
   
   output$sim_dot <- renderText({
-    req(ms2_for_mirror(), lib_ms2_data(), input$sim_m, input$sim_n, input$sim_ppm)
-    
-    x <- as.matrix(ms2_for_mirror()[, c("mz", "intensity")])
-    y <- as.matrix(lib_ms2_data()[, c("mz", "intensity")])
-    
-    # Alignment required for dot product to avoid "length" warning
-    joined <- MsCoreUtils::join(x[, 1], y[, 1], tolerance = 0, ppm = input$sim_ppm, type = "outer")
-    
-    # Reconstruct vectors (filling missing intensities with 0)
-    x_int <- x[joined$x, 2]; x_int[is.na(x_int)] <- 0
-    y_int <- y[joined$y, 2]; y_int[is.na(y_int)] <- 0
-    mz_aligned <- rowMeans(cbind(x[joined$x, 1], y[joined$y, 1]), na.rm = TRUE)
-    
-    score <- MsCoreUtils::ndotproduct(cbind(mz_aligned, x_int), 
-                                      cbind(mz_aligned, y_int), 
-                                      m = input$sim_m, n = input$sim_n)
-    
-    sprintf("%.3f", if(is.na(score)) 0 else score)
-  })
+  req(ms2_for_mirror(), lib_ms2_data(), input$sim_m, input$sim_n)
+
+  x <- as.matrix(ms2_for_mirror()[, c("mz", "intensity")])
+  y <- as.matrix(lib_ms2_data()[, c("mz", "intensity")])
+
+  tol <- sim_match_tolerance()
+
+  joined <- MsCoreUtils::join(
+    x[, 1],
+    y[, 1],
+    tolerance = tol$tolerance,
+    ppm = tol$ppm,
+    type = "outer"
+  )
+
+  x_int <- x[joined$x, 2]
+  y_int <- y[joined$y, 2]
+
+  x_int[is.na(x_int)] <- 0
+  y_int[is.na(y_int)] <- 0
+
+  mz_aligned <- rowMeans(
+    cbind(x[joined$x, 1], y[joined$y, 1]),
+    na.rm = TRUE
+  )
+
+  score <- MsCoreUtils::ndotproduct(
+    cbind(mz_aligned, x_int),
+    cbind(mz_aligned, y_int),
+    m = input$sim_m,
+    n = input$sim_n
+  )
+
+  sprintf("%.3f", if (is.na(score)) 0 else score)
+})
 
   # --- Match Stats (using closest) ---
   output$match_stats <- renderText({
-    req(ms2_for_mirror(), lib_ms2_data(), input$sim_ppm)
-    
-    samp_mz <- ms2_for_mirror()$mz
-    lib_mz <- lib_ms2_data()$mz
-    
-    # Find the index of the closest library peak for each sample peak
-    # tolerance = 0 because we are using ppm exclusively
-    closest_idx <- MsCoreUtils::closest(samp_mz, lib_mz, tolerance = 0, ppm = input$sim_ppm)
-    
-    # Count how many sample peaks successfully found a match (!is.na)
-    # We use unique() on the matches if you want to count how many LIB peaks were hit
-    matched <- sum(!is.na(closest_idx))
-    total <- length(lib_mz) 
-    
-    paste0(matched, " / ", total)
-  })
+  req(ms2_for_mirror(), lib_ms2_data())
 
-  
+  samp_mz <- ms2_for_mirror()$mz
+  lib_mz  <- lib_ms2_data()$mz
+
+  tol <- sim_match_tolerance()
+
+  closest_idx <- MsCoreUtils::closest(
+    lib_mz,
+    samp_mz,
+    tolerance = tol$tolerance,
+    ppm = tol$ppm
+  )
+
+  matched <- sum(!is.na(closest_idx))
+  total <- length(lib_mz)
+
+  paste0(matched, " / ", total)
+})
+
 }
 
 shinyApp(ui, server)
