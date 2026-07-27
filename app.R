@@ -1,8 +1,9 @@
-#Sys.setlocale("LC_ALL", "English_United States.1252")
-#Sys.setenv(LANG = "en_US.UTF-8")
-#Sys.setlocale("LC_ALL", "C.UTF-8")  
-#options(encoding = "UTF-8")
-#rsconnect::deployApp()
+# Sys.setlocale("LC_ALL", "English_United States.1252")
+# Sys.setenv(LANG = "en_US.UTF-8")
+# Sys.setlocale("LC_ALL", "C.UTF-8")  
+# options(encoding = "UTF-8")
+# options(rsconnect.http.timeout = 600)
+# rsconnect::deployApp()
 
 library(shiny)
 library(DT)
@@ -427,7 +428,7 @@ div(
                         choices = c("Adduct (M+H / M-H)" = "adduct",
                                     "Neutral mass (M)" = "neutral"),
                         inline = TRUE),
-          helpText("Parent mass & Charge are defined in the left sidebar. Calculation is based on the MetaboCoreUtils R package.")
+          helpText("Parent mass & Charge with Adduct type are defined in the left sidebar. Calculation is based on the MetaboCoreUtils R package.")
          ),
          fluidRow(
            column(12, 
@@ -446,6 +447,12 @@ tabPanel("Formula Finder",
          br(),
          wellPanel(
            fluidRow(
+             radioButtons(
+                "rdisop_input_type",
+                "Input mass is:",
+                choices = c(
+                  "Neutral mass (M)" = "neutral",
+                  "Adduct ([M+H]+ / [M-H]-)" = "adduct"), selected = "neutral", inline = TRUE),
              column(3, 
                 div(style = "display: flex; align-items: flex-end;",
                   numericInput("rdisop_mass", "Neutral Mass:", value = 180.063388, step = 0.0001))
@@ -454,7 +461,8 @@ tabPanel("Formula Finder",
              column(6, textInput("rdisop_elements_custom", "Allowed Elements (comma separated):", 
                                  value = "C, H, N, O"))
            ),
-           tags$small("Calculation is based on the Rdisop R package."),
+           helpText
+           ("Charge for Adduct type are defined in the left sidebar. Calculation is based on the Rdisop R package."),
            br(),
            br(),
            div(style = "text-align: center;",
@@ -1498,21 +1506,66 @@ ms1_filtered <- reactive({
   # Reactive to calculate the neutral mass (M)
   # 1. Update the reactive to also update the UI display
   neutral_mass <- reactive({
-    req(input$parent_mass, input$charge)
+      req(input$parent_mass, input$charge)
     
-    m_val <- if (input$input_type == "neutral") {
-      as.numeric(input$parent_mass)
-    } else {
-      # Back-calculate M from the assumed [M+H]+ or [M-H]-
-      add_type <- if (input$charge > 0) "[M+H]+" else "[M-H]-"
-      as.numeric(MetaboCoreUtils::mz2mass(input$parent_mass, add_type))
-    }
+      parent_mass <- suppressWarnings(
+        as.numeric(input$parent_mass)
+      )
     
-    # Update the text input field automatically
-    updateTextInput(session, "neutral_mass_display", value = sprintf("%.6f", m_val))
+      charge_value <- suppressWarnings(
+        as.integer(input$charge)
+      )
     
-    return(m_val)
-  })
+      validate(
+        need(
+          is.finite(parent_mass) && parent_mass > 0,
+          "Parent mass must be a positive numeric value."
+        ),
+        need(
+          is.finite(charge_value) &&
+            charge_value %in% c(-1L, 1L),
+          paste0(
+            "Adduct Calculator supports only charge +1 or -1. ",
+            "Use +1 for positive mode and -1 for negative mode."
+          )
+        )
+      )
+    
+      m_val <- if (identical(input$input_type, "neutral")) {
+    
+        parent_mass
+    
+      } else {
+    
+        add_type <- if (charge_value == 1L) {
+          "[M+H]+"
+        } else {
+          "[M-H]-"
+        }
+    
+        as.numeric(
+          MetaboCoreUtils::mz2mass(
+            parent_mass,
+            add_type
+          )
+        )
+      }
+    
+      validate(
+        need(
+          is.finite(m_val) && m_val > 0,
+          "Unable to calculate a valid neutral mass."
+        )
+      )
+    
+      updateTextInput(
+        session,
+        "neutral_mass_display",
+        value = sprintf("%.6f", m_val)
+      )
+    
+      m_val
+    })
 
   # 2. Add the Copy Logic for the Adduct Tab
   observeEvent(input$copy_neutral_mass, {
@@ -1585,36 +1638,135 @@ ms1_filtered <- reactive({
   # --- Rdisop: Formula Finder Logic ---
 
 rdisop_results <- eventReactive(input$run_rdisop, {
-  req(input$rdisop_mass, input$rdisop_elements_custom)
-  
-  # Parse the comma-separated string into a clean vector
-  elem_vec <- strsplit(input$rdisop_elements_custom, ",")[[1]]
-  elem_vec <- trimws(elem_vec) # Remove extra spaces
-  elem_vec <- elem_vec[elem_vec != ""] # Remove empty strings
-  
-  # Initialize elements dynamically
-  elem_list <- tryCatch({
-    initializeElements(elem_vec)
-  }, error = function(e) {
-    showNotification("Invalid element symbol detected. Please use standard symbols (e.g., Cl, Fe, Br).", type = "error")
-    return(NULL)
-  })
-  
+
+  req(
+    input$rdisop_mass,
+    input$rdisop_elements_custom
+  )
+
+  input_mass <- suppressWarnings(
+    as.numeric(input$rdisop_mass)
+  )
+
+  validate(
+    need(
+      is.finite(input_mass) && input_mass > 0,
+      "Mass must be a positive numeric value."
+    )
+  )
+
+  # Convert the supplied adduct m/z to neutral mass when requested
+  neutral_mass_rdisop <- if (
+    identical(
+  input$rdisop_input_type,
+  "adduct"
+)
+  ) {
+
+    charge_value <- suppressWarnings(
+      as.integer(input$charge)
+    )
+
+    validate(
+      need(
+        is.finite(charge_value) && charge_value != 0,
+        "Set Charge to +1 for [M+H]+ or -1 for [M-H]-."
+      ),
+      need(
+        abs(charge_value) == 1,
+        paste0(
+          "Formula Finder currently supports only singly charged ",
+          "[M+H]+ or [M-H]- input."
+        )
+      )
+    )
+
+    adduct_type <- if (charge_value > 0) {
+      "[M+H]+"
+    } else {
+      "[M-H]-"
+    }
+
+    as.numeric(
+      MetaboCoreUtils::mz2mass(
+        input_mass,
+        adduct_type
+      )
+    )
+
+  } else {
+
+    input_mass
+  }
+
+  validate(
+    need(
+      is.finite(neutral_mass_rdisop) &&
+        neutral_mass_rdisop > 0,
+      "Unable to calculate a valid neutral mass."
+    )
+  )
+
+  # Parse allowed elements
+  elem_vec <- strsplit(
+    input$rdisop_elements_custom,
+    ","
+  )[[1]]
+
+  elem_vec <- trimws(elem_vec)
+  elem_vec <- elem_vec[nzchar(elem_vec)]
+
+  elem_list <- tryCatch(
+    {
+      Rdisop::initializeElements(elem_vec)
+    },
+    error = function(e) {
+      showNotification(
+        paste0(
+          "Invalid element symbol detected. ",
+          "Use standard symbols such as C, H, N, O, Cl, Fe, or Br."
+        ),
+        type = "error"
+      )
+
+      NULL
+    }
+  )
+
   req(elem_list)
-  
-  # Decompose mass
-  res <- decomposeMass(input$rdisop_mass, ppm = input$rdisop_ppm, elements = elem_list)
-  
-  validate(need(!is.null(res$formula), "No formulas found within this tolerance and element set."))
-  
-  # Build and sort Table
+
+  # Rdisop always receives the neutral mass
+  res <- Rdisop::decomposeMass(
+    neutral_mass_rdisop,
+    ppm = input$rdisop_ppm,
+    elements = elem_list
+  )
+
+  validate(
+    need(
+      !is.null(res$formula) &&
+        length(res$formula) > 0,
+      paste0(
+        "No formulas found within this tolerance ",
+        "and element set."
+      )
+    )
+  )
+
   df <- data.frame(
-    Formula   = res$formula,
+    Formula = res$formula,
     ExactMass = res$exactmass,
-    Error_PPM = abs((res$exactmass - input$rdisop_mass) / input$rdisop_mass) * 1e6,
+    Error_PPM = abs(
+      (
+        res$exactmass -
+          neutral_mass_rdisop
+      ) /
+        neutral_mass_rdisop
+    ) * 1e6,
     stringsAsFactors = FALSE
   )
-  df[order(df$Error_PPM), ]
+
+  df[order(df$Error_PPM), , drop = FALSE]
 })
 
 output$rdisop_table <- renderDT({
