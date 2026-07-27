@@ -412,7 +412,7 @@ div(
                         choices = c("Adduct (M+H / M-H)" = "adduct",
                                     "Neutral mass (M)" = "neutral"),
                         inline = TRUE),
-          helpText("Parent mass & Charge with Adduct type are defined in the left sidebar. Calculation is based on the MetaboCoreUtils R package.")
+          helpText("Parent mass & Charge for Adduct type are defined in the left sidebar. Calculation is based on the MetaboCoreUtils R package.")
          ),
          fluidRow(
            column(12,
@@ -446,7 +446,7 @@ tabPanel("Formula Finder",
                                  value = "C, H, N, O"))
            ),
            helpText
-           ("Charge for Adduct type are defined in the left sidebar. Calculation is based on the Rdisop R package."),
+           ("Charge for Adduct type is defined in the left sidebar. Calculation is based on the Rdisop R package."),
            br(),
            br(),
            div(style = "text-align: center;",
