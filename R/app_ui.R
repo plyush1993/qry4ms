@@ -412,7 +412,7 @@ div(
                         choices = c("Adduct (M+H / M-H)" = "adduct",
                                     "Neutral mass (M)" = "neutral"),
                         inline = TRUE),
-          helpText("Parent mass & Charge are defined in the left sidebar. Calculation is based on the MetaboCoreUtils R package.")
+          helpText("Parent mass & Charge with Adduct type are defined in the left sidebar. Calculation is based on the MetaboCoreUtils R package.")
          ),
          fluidRow(
            column(12,
@@ -431,6 +431,12 @@ tabPanel("Formula Finder",
          br(),
          wellPanel(
            fluidRow(
+             radioButtons(
+                "rdisop_input_type",
+                "Input mass is:",
+                choices = c(
+                  "Neutral mass (M)" = "neutral",
+                  "Adduct ([M+H]+ / [M-H]-)" = "adduct"), selected = "neutral", inline = TRUE),
              column(3,
                 div(style = "display: flex; align-items: flex-end;",
                   numericInput("rdisop_mass", "Neutral Mass:", value = 180.063388, step = 0.0001))
@@ -439,7 +445,8 @@ tabPanel("Formula Finder",
              column(6, textInput("rdisop_elements_custom", "Allowed Elements (comma separated):",
                                  value = "C, H, N, O"))
            ),
-           tags$small("Calculation is based on the Rdisop R package."),
+           helpText
+           ("Charge for Adduct type are defined in the left sidebar. Calculation is based on the Rdisop R package."),
            br(),
            br(),
            div(style = "text-align: center;",
