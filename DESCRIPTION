@@ -1,6 +1,6 @@
 Package: qry4ms
 Title: Shiny App for making MS query
-Version: 0.1.1
+Version: 0.1.2
 Authors@R: 
     person("Ivan", "Plyushchenko", , "plyushchenko.ivan@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-3883-4695"))
