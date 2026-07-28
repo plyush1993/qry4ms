@@ -12,7 +12,7 @@ The [`Shiny App`](https://shiny.posit.co/) for making an MS query:
 - Builds a mirror plot from the reference spectra, and calculates similarity and matched peaks based on [`MsCoreUtils`](https://bioconductor.org/packages/release/bioc/html/MsCoreUtils.html).
 - Computes Isotopic Pattern Distribution and Monoisotopic Mass for chemical formula based on [`envipat`](https://cran.r-project.org/web/packages/enviPat/index.html).
 - Calculates Adducts Map based on [`MetaboCoreUtils`](https://www.bioconductor.org/packages/release/bioc/html/MetaboCoreUtils.html).
-- Generates Molecular Formula based on [`Rdisop`](https://bioconductor.org/packages/release/bioc/html/Rdisop.html).
+- Generates Molecular Formula based on [`Rdisop`](https://bioconductor.org/packages/release/bioc/html/Rdisop.html) by accurate mass or isotopic pattern.
 - Interprets MS1 spectra based on [`InterpretMSSpectrum`](https://cran.r-project.org/web/packages/InterpretMSSpectrum/index.html).
 - Calculates Mass Error.
 
