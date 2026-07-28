@@ -5,6 +5,7 @@
 # options(rsconnect.http.timeout = 600)
 # rsconnect::deployApp()
 
+# ----------------------------- qry4ms -----------------------------------------
 library(shiny)
 library(DT)
 library(ggplot2)
@@ -24,6 +25,7 @@ library(MsCoreUtils)
 
 data(isotopes, package = "enviPat")
 
+# ----------------------------- UI -----------------------------------------
 ui <- fluidPage(
   useShinyjs(),
   
@@ -443,33 +445,195 @@ div(
          DTOutput("adduct_table") %>% withSpinner()
 ),
 
-tabPanel("Formula Finder",
-         br(),
-         wellPanel(
-           fluidRow(
-             radioButtons(
-                "rdisop_input_type",
-                "Input mass is:",
-                choices = c(
-                  "Neutral mass (M)" = "neutral",
-                  "Adduct ([M+H]+ / [M-H]-)" = "adduct"), selected = "neutral", inline = TRUE),
-             column(3, 
-                div(style = "display: flex; align-items: flex-end;",
-                  numericInput("rdisop_mass", "Neutral Mass:", value = 180.063388, step = 0.0001))
-              ),
-             column(3, numericInput("rdisop_ppm", "PPM Tolerance:", value = 5, min = 0.1)),
-             column(6, textInput("rdisop_elements_custom", "Allowed Elements (comma separated):", 
-                                 value = "C, H, N, O"))
-           ),
-           helpText
-           ("Charge for Adduct type is defined in the left sidebar. Calculation is based on the Rdisop R package."),
-           br(),
-           br(),
-           div(style = "text-align: center;",
-            actionButton("run_rdisop", "Generate Formulas", class = "btn-info", width = "30%")
-            )
-         ),
-         DTOutput("rdisop_table") %>% withSpinner()
+tabPanel(
+  "Formula Finder",
+
+  br(),
+
+  h3(
+    class = "highlight",
+    "Find Formula by Accurate Mass"
+  ),
+
+  br(),
+
+  wellPanel(
+
+    radioButtons(
+      "rdisop_input_type",
+      "Input mass is:",
+      choices = c(
+        "Neutral mass (M)" = "neutral",
+        "Adduct ([M+H]+ / [M-H]-)" = "adduct"
+      ),
+      selected = "neutral",
+      inline = TRUE
+    ),
+
+    fluidRow(
+
+      column(
+        3,
+        numericInput(
+          "rdisop_mass",
+          "Mass / m/z:",
+          value = 180.063388,
+          step = 0.0001
+        )
+      ),
+
+      column(
+        3,
+        numericInput(
+          "rdisop_ppm",
+          "PPM Tolerance:",
+          value = 5,
+          min = 0.1,
+          step = 0.1
+        )
+      ),
+
+      column(
+        6,
+        textInput(
+          "rdisop_elements_custom",
+          "Allowed Elements (comma separated):",
+          value = "C, H, N, O"
+        )
+      )
+    ),
+
+    helpText(
+      paste0(
+        "Charge for adduct input is defined in the left sidebar. ",
+        "Only +1 for [M+H]+ and -1 for [M-H]- are supported. ",
+        "Calculation is based on the Rdisop R package."
+      )
+    ),
+
+    br(),
+
+    div(
+      style = "text-align: center;",
+
+      actionButton(
+        "run_rdisop",
+        "Generate Formulas",
+        class = "btn-info",
+        width = "30%"
+      )
+    )
+  ),
+
+  DTOutput("rdisop_table") %>%
+    withSpinner(color = "#0066cc"),
+
+  tags$hr(
+    style = paste0(
+      "border-top: 3px solid #0066cc;",
+      "margin-top: 35px;",
+      "margin-bottom: 30px;"
+    )
+  ),
+
+  h3(
+    class = "highlight",
+    "Find Formula by Isotopic Pattern"
+  ),
+
+  br(),
+
+  wellPanel(
+    fluidRow(
+      column(
+        4,
+        numericInput(
+          "rdisop_iso_ppm",
+          "PPM Tolerance:",
+          value = 5,
+          min = 0.1,
+          step = 0.1
+        )
+      ),
+
+      column(
+        8,
+        textInput(
+          "rdisop_iso_elements_custom",
+          "Allowed Elements (comma separated):",
+          value = "C, H, N, O"
+        )
+      )
+    ),
+
+    div(
+      class = "alert alert-warning",
+
+      style = paste0(
+        "font-size: 15px;",
+        "font-weight: 600;",
+        "margin-top: 10px;",
+        "margin-bottom: 12px;"
+      ),
+
+      tags$b("Important: "),
+
+      paste0(
+        "this calculation uses the current filtered MS1 spectrum from ",
+        "the left sidebar. Use the MS1 m/z and relative-intensity filters ",
+        "to keep only one suspected isotopic pattern, such as M, M+1 and ",
+        "M+2. Remove unrelated compounds, other adducts, fragments and ",
+        "noise peaks before running the prediction."
+      )
+    ),
+
+    helpText(
+      paste0(
+        "Charge is taken from the left sidebar. ",
+        "Use Charge = 0 to allow Rdisop charge auto-detection.",
+        "Calculation is based on the Rdisop R package."
+      )
+    ),
+
+    br(),
+
+    div(
+      style = "text-align: center;",
+
+      actionButton(
+        "run_rdisop_iso",
+        "Generate Formulas",
+        class = "btn-info",
+        width = "45%"
+      )
+    )
+  ),
+
+  h4(
+    "Current Filtered MS1 Used for Prediction",
+    style = "
+      font-weight: bold;
+      color: #2c3e50;
+      margin-top: 20px;
+    "
+  ),
+
+  DTOutput("rdisop_iso_ms1_table") %>%
+    withSpinner(color = "#0066cc"),
+
+  br(),
+
+  h4(
+    "Formula Candidates from Isotopic Pattern",
+    style = "
+      font-weight: bold;
+      color: #2c3e50;
+      margin-top: 20px;
+    "
+  ),
+
+  DTOutput("rdisop_iso_table") %>%
+    withSpinner(color = "#0066cc")
 ),
 
 tabPanel("Interpret MS1",
@@ -477,7 +641,7 @@ br(),
          wellPanel(
            fluidRow(
              column(4, 
-                    p(tags$b("About:"), "This algorithm evaluates MS1 specta clusters to propose the most likely neutral mass and identifies adducts/isotopes automatically. Calculation is based on the InterpretMSSpectrum R package."),
+                    p(tags$b("About:"), "This algorithm evaluates provided MS1 specta clusters to propose the most likely neutral mass and identifies adducts/isotopes automatically. Calculation is based on the InterpretMSSpectrum R package."),
              ),
              column(3, 
                     radioButtons("fm_ionmode", "Ion Mode:", 
@@ -583,7 +747,19 @@ br(),
   )
 )
 
+# ----------------------------- Server -------------------------------------
 server <- function(input, output, session) {
+  
+  download_base_name <- reactive({
+  nm <- trimws(as.character(input$compound_name))
+
+  if (is.null(nm) || !length(nm) || is.na(nm) || !nzchar(nm)) {
+    nm <- "Compound_X"
+  }
+
+  # Replace characters that Windows does not allow in filenames
+  gsub('[<>:"/\\\\|?*]', "_", nm)
+})
   
  parse_spectrum <- function(input_type, text_value, file_input, label = "MS") {
 
@@ -1626,14 +1802,39 @@ ms1_filtered <- reactive({
     rownames = FALSE,
     options = list(
       dom = 'Bfrtip',        # Changed from '<"top"f>rt<"bottom"lp>'
-      buttons = c('copy', 'csv', 'excel'), # Added
+      buttons = list(
+  list(
+    extend = "copy",
+    text = "Copy"
+  ),
+  list(
+    extend = "csvHtml5",
+    text = "Download CSV",
+    filename = JS(
+      "function() {
+         var base = $('#compound_name').val() || 'Compound_X';
+         return base + '_adducts_table';
+       }"
+    )
+  ),
+  list(
+    extend = "excelHtml5",
+    text = "Download Excel",
+    filename = JS(
+      "function() {
+         var base = $('#compound_name').val() || 'Compound_X';
+         return base + '_adducts_table';
+       }"
+    )
+  )
+),
       pageLength = 20, 
       columnDefs = list(list(className = 'dt-center', targets = 1:2))
     ),
     # ... (keep your caption) ...
   ) %>% formatRound(columns = "mz", digits = 6)
     
-  })
+  }, server = FALSE)
   
   # --- Rdisop: Formula Finder Logic ---
 
@@ -1775,10 +1976,470 @@ output$rdisop_table <- renderDT({
             rownames = FALSE, 
             options = list(
               dom = 'Bfrtip',        # Added (B = Buttons, f = Search)
-              buttons = c('copy', 'csv', 'excel'), # Added
+              buttons = list(
+  list(
+    extend = "copy",
+    text = "Copy"
+  ),
+  list(
+    extend = "csvHtml5",
+    text = "Download CSV",
+    filename = JS(
+      "function() {
+         var base = $('#compound_name').val() || 'Compound_X';
+         return base + '_formula_finder_mass';
+       }"
+    )
+  ),
+  list(
+    extend = "excelHtml5",
+    text = "Download Excel",
+    filename = JS(
+      "function() {
+         var base = $('#compound_name').val() || 'Compound_X';
+         return base + '_formula_finder_mass';
+       }"
+    )
+  )
+),
               pageLength = 10, scrollX = TRUE)) %>%
     formatRound(columns = c("ExactMass", "Error_PPM"), digits = 5)
+}, server = FALSE)
+
+rdisop_iso_ms1_data <- reactive({
+
+  # Directly uses the existing MS1 spectrum and sidebar filters
+  df <- ms1_filtered()
+
+  df <- as.data.frame(
+    df,
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+
+  df$mz <- suppressWarnings(
+    as.numeric(df$mz)
+  )
+
+  df$intensity <- suppressWarnings(
+    as.numeric(df$intensity)
+  )
+
+  # Remove invalid, zero and negative values
+  df <- df[
+    is.finite(df$mz) &
+      is.finite(df$intensity) &
+      df$mz > 0 &
+      df$intensity > 0,
+    ,
+    drop = FALSE
+  ]
+
+  validate(
+    need(
+      nrow(df) >= 2,
+      paste0(
+        "At least two filtered MS1 peaks are required. ",
+        "Keep the monoisotopic peak and at least one isotope peak."
+      )
+    )
+  )
+
+  # The isotope cluster must be supplied from low to high m/z
+  df <- df[
+    order(df$mz),
+    ,
+    drop = FALSE
+  ]
+
+  max_intensity <- max(
+    df$intensity,
+    na.rm = TRUE
+  )
+
+  validate(
+    need(
+      is.finite(max_intensity) &&
+        max_intensity > 0,
+      "Filtered MS1 intensities must contain positive values."
+    )
+  )
+
+  df$relative_intensity <- (
+    df$intensity /
+      max_intensity
+  ) * 100
+
+  df$isotope_peak <- paste0(
+    "Peak ",
+    seq_len(nrow(df))
+  )
+
+  df <- df[
+    ,
+    c(
+      "isotope_peak",
+      "mz",
+      "intensity",
+      "relative_intensity"
+    ),
+    drop = FALSE
+  ]
+
+  names(df) <- c(
+    "Isotope Peak",
+    "m/z",
+    "Intensity",
+    "Relative Intensity (%)"
+  )
+
+  df
 })
+
+output$rdisop_iso_ms1_table <- renderDT({
+
+  df <- rdisop_iso_ms1_data()
+
+  datatable(
+    df,
+
+    extensions = "Buttons",
+    rownames = FALSE,
+
+    options = list(
+      dom = "Bfrtip",
+
+      buttons = list(
+  list(
+    extend = "copy",
+    text = "Copy"
+  ),
+  list(
+    extend = "csvHtml5",
+    text = "Download CSV",
+    filename = JS(
+      "function() {
+         var base = $('#compound_name').val() || 'Compound_X';
+         return base + '_formula_finder_isotopic_pattern_input_MS1';
+       }"
+    )
+  ),
+  list(
+    extend = "excelHtml5",
+    text = "Download Excel",
+    filename = JS(
+      "function() {
+         var base = $('#compound_name').val() || 'Compound_X';
+         return base + '_formula_finder_isotopic_pattern_input_MS1';
+       }"
+    )
+  )
+),
+
+      pageLength = 10,
+      scrollX = TRUE,
+      ordering = FALSE,
+
+      columnDefs = list(
+        list(
+          className = "dt-center",
+          targets = "_all"
+        )
+      )
+    )
+  ) %>%
+
+    formatRound(
+      columns = "m/z",
+      digits = 6
+    ) %>%
+
+    formatRound(
+      columns = "Relative Intensity (%)",
+      digits = 3
+    )
+}, server = FALSE)
+
+rdisop_iso_results <- eventReactive(
+  input$run_rdisop_iso,
+  {
+
+    used_ms1 <- rdisop_iso_ms1_data()
+
+    isotope_masses <- suppressWarnings(
+      as.numeric(used_ms1[["m/z"]])
+    )
+
+    isotope_intensities <- suppressWarnings(
+      as.numeric(used_ms1[["Intensity"]])
+    )
+
+    validate(
+      need(
+        length(isotope_masses) >= 2,
+        "At least two isotope masses are required."
+      ),
+
+      need(
+        length(isotope_masses) ==
+          length(isotope_intensities),
+        paste0(
+          "The numbers of isotope masses and intensities ",
+          "must be identical."
+        )
+      ),
+
+      need(
+        all(is.finite(isotope_masses)),
+        "The filtered MS1 spectrum contains invalid m/z values."
+      ),
+
+      need(
+        all(
+          is.finite(isotope_intensities) &
+            isotope_intensities > 0
+        ),
+        paste0(
+          "The filtered MS1 spectrum contains invalid ",
+          "or non-positive intensities."
+        )
+      )
+    )
+
+    ppm_value <- suppressWarnings(
+      as.numeric(input$rdisop_iso_ppm)
+    )
+
+    validate(
+      need(
+        is.finite(ppm_value) &&
+          ppm_value > 0,
+        "PPM tolerance must be a positive numeric value."
+      )
+    )
+
+    charge_value <- suppressWarnings(
+      as.numeric(input$charge)
+    )
+
+    validate(
+      need(
+        is.finite(charge_value),
+        "Charge must be numeric."
+      ),
+
+      need(
+        charge_value == round(charge_value),
+        "Charge must be a whole number."
+      )
+    )
+
+    charge_value <- as.integer(
+      round(charge_value)
+    )
+
+    element_names <- strsplit(
+      input$rdisop_iso_elements_custom,
+      ",",
+      fixed = TRUE
+    )[[1]]
+
+    element_names <- trimws(
+      element_names
+    )
+
+    element_names <- element_names[
+      nzchar(element_names)
+    ]
+
+    validate(
+      need(
+        length(element_names) > 0,
+        "Specify at least one allowed element."
+      )
+    )
+
+    element_list <- tryCatch(
+      {
+        Rdisop::initializeElements(
+          element_names
+        )
+      },
+
+      error = function(e) {
+
+        showNotification(
+          paste0(
+            "Invalid element list: ",
+            conditionMessage(e),
+            ". Use standard symbols such as C, H, N, O, ",
+            "S, P, Cl or Br."
+          ),
+          type = "error",
+          duration = 8
+        )
+
+        NULL
+      }
+    )
+
+    req(element_list)
+
+    molecule_results <- tryCatch(
+      {
+        Rdisop::decomposeIsotopes(
+          masses = isotope_masses,
+          intensities = isotope_intensities,
+          ppm = ppm_value,
+          elements = element_list,
+          z = charge_value
+        )
+      },
+
+      error = function(e) {
+
+        showNotification(
+          paste0(
+            "Isotopic-pattern formula prediction failed: ",
+            conditionMessage(e)
+          ),
+          type = "error",
+          duration = 8
+        )
+
+        NULL
+      }
+    )
+
+    req(molecule_results)
+
+    formulas <- as.character(
+      Rdisop::getFormula(
+        molecule_results
+      )
+    )
+
+    exact_masses <- as.numeric(
+      Rdisop::getMass(
+        molecule_results
+      )
+    )
+
+    scores <- as.numeric(
+      Rdisop::getScore(
+        molecule_results
+      )
+    )
+
+    valid_values <- as.character(
+      Rdisop::getValid(
+        molecule_results
+      )
+    )
+
+    validate(
+      need(
+        length(formulas) > 0,
+        paste0(
+          "No formulas were found for the current filtered ",
+          "MS1 isotope pattern. Check the MS1 filtering, ",
+          "allowed elements, charge and tolerance."
+        )
+      )
+    )
+
+    validate(
+      need(
+        length(exact_masses) == length(formulas),
+        "Rdisop returned inconsistent formula and mass results."
+      ),
+
+      need(
+        length(scores) == length(formulas),
+        "Rdisop returned inconsistent formula and score results."
+      ),
+
+      need(
+        length(valid_values) == length(formulas),
+        "Rdisop returned inconsistent formula-validity results."
+      )
+    )
+
+    result_df <- data.frame(
+      Rank = seq_along(formulas),
+      Formula = formulas,
+      ExactMass = exact_masses,
+      Score = scores,
+      Valid = valid_values,
+      stringsAsFactors = FALSE
+    )
+
+    result_df
+  }
+)
+
+output$rdisop_iso_table <- renderDT({
+
+  df <- rdisop_iso_results()
+
+  datatable(
+    df,
+
+    extensions = "Buttons",
+    rownames = FALSE,
+
+    options = list(
+      dom = "Bfrtip",
+
+      buttons = list(
+  list(
+    extend = "copy",
+    text = "Copy"
+  ),
+  list(
+    extend = "csvHtml5",
+    text = "Download CSV",
+    filename = JS(
+      "function() {
+         var base = $('#compound_name').val() || 'Compound_X';
+         return base + '_formula_finder_isotopic_pattern';
+       }"
+    )
+  ),
+  list(
+    extend = "excelHtml5",
+    text = "Download Excel",
+    filename = JS(
+      "function() {
+         var base = $('#compound_name').val() || 'Compound_X';
+         return base + '_formula_finder_isotopic_pattern';
+       }"
+    )
+  )
+),
+
+      pageLength = 10,
+      scrollX = TRUE,
+
+      columnDefs = list(
+        list(
+          className = "dt-center",
+          targets = "_all"
+        )
+      )
+    )
+  ) %>%
+
+    formatRound(
+      columns = "ExactMass",
+      digits = 6
+    ) %>%
+
+    formatSignif(
+      columns = "Score",
+      digits = 7
+    )
+}, server = FALSE)
 
 # 1. Execute findMAIN algorithm on button click
   fm_results <- eventReactive(input$run_findmain, {
@@ -1822,13 +2483,38 @@ output$rdisop_table <- renderDT({
     rownames = FALSE,
     options = list(
       dom = 'Bfrtip',        # Added
-      buttons = c('copy', 'csv', 'excel'), # Added
+      buttons = list(
+  list(
+    extend = "copy",
+    text = "Copy"
+  ),
+  list(
+    extend = "csvHtml5",
+    text = "Download CSV",
+    filename = JS(
+      "function() {
+         var base = $('#compound_name').val() || 'Compound_X';
+         return base + '_interpretMS1';
+       }"
+    )
+  ),
+  list(
+    extend = "excelHtml5",
+    text = "Download Excel",
+    filename = JS(
+      "function() {
+         var base = $('#compound_name').val() || 'Compound_X';
+         return base + '_interpretMS1';
+       }"
+    )
+  )
+),
       scrollX = TRUE, 
       pageLength = 10,
       columnDefs = list(list(className = 'dt-center', targets = "_all"))
     )
   )
-  })
+  }, server = FALSE)
   
   range_mass_window <- reactive({
   req(input$range_m)
@@ -2003,4 +2689,5 @@ observe({
 
 }
 
+# ----------------------------- Run -------------------------------------
 shinyApp(ui, server)
