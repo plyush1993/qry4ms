@@ -427,33 +427,195 @@ div(
          DTOutput("adduct_table") %>% withSpinner()
 ),
 
-tabPanel("Formula Finder",
-         br(),
-         wellPanel(
-           fluidRow(
-             radioButtons(
-                "rdisop_input_type",
-                "Input mass is:",
-                choices = c(
-                  "Neutral mass (M)" = "neutral",
-                  "Adduct ([M+H]+ / [M-H]-)" = "adduct"), selected = "neutral", inline = TRUE),
-             column(3,
-                div(style = "display: flex; align-items: flex-end;",
-                  numericInput("rdisop_mass", "Neutral Mass:", value = 180.063388, step = 0.0001))
-              ),
-             column(3, numericInput("rdisop_ppm", "PPM Tolerance:", value = 5, min = 0.1)),
-             column(6, textInput("rdisop_elements_custom", "Allowed Elements (comma separated):",
-                                 value = "C, H, N, O"))
-           ),
-           helpText
-           ("Charge for Adduct type is defined in the left sidebar. Calculation is based on the Rdisop R package."),
-           br(),
-           br(),
-           div(style = "text-align: center;",
-            actionButton("run_rdisop", "Generate Formulas", class = "btn-info", width = "30%")
-            )
-         ),
-         DTOutput("rdisop_table") %>% withSpinner()
+tabPanel(
+  "Formula Finder",
+
+  br(),
+
+  h3(
+    class = "highlight",
+    "Find Formula by Accurate Mass"
+  ),
+
+  br(),
+
+  wellPanel(
+
+    radioButtons(
+      "rdisop_input_type",
+      "Input mass is:",
+      choices = c(
+        "Neutral mass (M)" = "neutral",
+        "Adduct ([M+H]+ / [M-H]-)" = "adduct"
+      ),
+      selected = "neutral",
+      inline = TRUE
+    ),
+
+    fluidRow(
+
+      column(
+        3,
+        numericInput(
+          "rdisop_mass",
+          "Mass / m/z:",
+          value = 180.063388,
+          step = 0.0001
+        )
+      ),
+
+      column(
+        3,
+        numericInput(
+          "rdisop_ppm",
+          "PPM Tolerance:",
+          value = 5,
+          min = 0.1,
+          step = 0.1
+        )
+      ),
+
+      column(
+        6,
+        textInput(
+          "rdisop_elements_custom",
+          "Allowed Elements (comma separated):",
+          value = "C, H, N, O"
+        )
+      )
+    ),
+
+    helpText(
+      paste0(
+        "Charge for adduct input is defined in the left sidebar. ",
+        "Only +1 for [M+H]+ and -1 for [M-H]- are supported. ",
+        "Calculation is based on the Rdisop R package."
+      )
+    ),
+
+    br(),
+
+    div(
+      style = "text-align: center;",
+
+      actionButton(
+        "run_rdisop",
+        "Generate Formulas",
+        class = "btn-info",
+        width = "30%"
+      )
+    )
+  ),
+
+  DTOutput("rdisop_table") %>%
+    withSpinner(color = "#0066cc"),
+
+  tags$hr(
+    style = paste0(
+      "border-top: 3px solid #0066cc;",
+      "margin-top: 35px;",
+      "margin-bottom: 30px;"
+    )
+  ),
+
+  h3(
+    class = "highlight",
+    "Find Formula by Isotopic Pattern"
+  ),
+
+  br(),
+
+  wellPanel(
+    fluidRow(
+      column(
+        4,
+        numericInput(
+          "rdisop_iso_ppm",
+          "PPM Tolerance:",
+          value = 5,
+          min = 0.1,
+          step = 0.1
+        )
+      ),
+
+      column(
+        8,
+        textInput(
+          "rdisop_iso_elements_custom",
+          "Allowed Elements (comma separated):",
+          value = "C, H, N, O"
+        )
+      )
+    ),
+
+    div(
+      class = "alert alert-warning",
+
+      style = paste0(
+        "font-size: 15px;",
+        "font-weight: 600;",
+        "margin-top: 10px;",
+        "margin-bottom: 12px;"
+      ),
+
+      tags$b("Important: "),
+
+      paste0(
+        "this calculation uses the current filtered MS1 spectrum from ",
+        "the left sidebar. Use the MS1 m/z and relative-intensity filters ",
+        "to keep only one suspected isotopic pattern, such as M, M+1 and ",
+        "M+2. Remove unrelated compounds, other adducts, fragments and ",
+        "noise peaks before running the prediction."
+      )
+    ),
+
+    helpText(
+      paste0(
+        "Charge is taken from the left sidebar. ",
+        "Use Charge = 0 to allow Rdisop charge auto-detection.",
+        "Calculation is based on the Rdisop R package."
+      )
+    ),
+
+    br(),
+
+    div(
+      style = "text-align: center;",
+
+      actionButton(
+        "run_rdisop_iso",
+        "Generate Formulas",
+        class = "btn-info",
+        width = "45%"
+      )
+    )
+  ),
+
+  h4(
+    "Current Filtered MS1 Used for Prediction",
+    style = "
+      font-weight: bold;
+      color: #2c3e50;
+      margin-top: 20px;
+    "
+  ),
+
+  DTOutput("rdisop_iso_ms1_table") %>%
+    withSpinner(color = "#0066cc"),
+
+  br(),
+
+  h4(
+    "Formula Candidates from Isotopic Pattern",
+    style = "
+      font-weight: bold;
+      color: #2c3e50;
+      margin-top: 20px;
+    "
+  ),
+
+  DTOutput("rdisop_iso_table") %>%
+    withSpinner(color = "#0066cc")
 ),
 
 tabPanel("Interpret MS1",
@@ -461,7 +623,7 @@ br(),
          wellPanel(
            fluidRow(
              column(4,
-                    p(tags$b("About:"), "This algorithm evaluates MS1 specta clusters to propose the most likely neutral mass and identifies adducts/isotopes automatically. Calculation is based on the InterpretMSSpectrum R package."),
+                    p(tags$b("About:"), "This algorithm evaluates provided MS1 specta clusters to propose the most likely neutral mass and identifies adducts/isotopes automatically. Calculation is based on the InterpretMSSpectrum R package."),
              ),
              column(3,
                     radioButtons("fm_ionmode", "Ion Mode:",
